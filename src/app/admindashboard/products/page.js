@@ -372,7 +372,7 @@ export default function AdminProducts() {
                 <div className="flex flex-wrap gap-2">
                   {searchTerm && (
                     <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                      Search: "{searchTerm}"
+                      Search: {searchTerm}
                     </span>
                   )}
                   {selectedCategory && (

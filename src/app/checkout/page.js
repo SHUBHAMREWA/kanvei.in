@@ -401,7 +401,7 @@ export default function CheckoutPage() {
                           style={{ fontFamily: "Montserrat, sans-serif", focusRingColor: "#5A0117" }}
                         />
                         <p className="mt-1 text-xs" style={{ color: "#8C6141", fontFamily: "Montserrat, sans-serif" }}>
-                          📱 We'll use this number to coordinate delivery with you
+                          📱 We will use this number to coordinate delivery with you
                         </p>
                       </div>
                     </div>

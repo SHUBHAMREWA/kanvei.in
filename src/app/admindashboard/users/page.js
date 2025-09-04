@@ -589,7 +589,7 @@ export default function AdminUsers() {
             <div className="mt-4 flex flex-wrap gap-2">
               {search.trim() && (
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                  Search: "{search}"
+                  Search: {search}
                 </span>
               )}
               {dateFilter !== "all" && (

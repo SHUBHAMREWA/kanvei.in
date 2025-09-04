@@ -41,7 +41,7 @@ export default function AboutPage() {
                     Founded with a vision to bring together the finest collection of premium products, Kanvei has emerged as a trusted destination for discerning customers who value quality, style, and authenticity.
                   </p>
                   <p className="text-lg leading-relaxed">
-                    Our journey began with a simple belief: that every product should tell a story of craftsmanship, innovation, and care. From elegant stationery that inspires creativity to exquisite jewelry that celebrates life's special moments, we curate only the best.
+                    Our journey began with a simple belief: that every product should tell a story of craftsmanship, innovation, and care. From elegant stationery that inspires creativity to exquisite jewelry that celebrates life s special moments, we curate only the best.
                   </p>
                   <p className="text-lg leading-relaxed">
                     Today, Kanvei stands as a testament to our commitment to excellence, serving customers across diverse categories with the same passion and dedication that started our journey.
@@ -146,7 +146,7 @@ export default function AboutPage() {
                 Meet Our Founders
               </h2>
               <p className="text-lg text-gray-700 max-w-2xl mx-auto" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                The visionary minds behind Kanvei's commitment to excellence and innovation
+                The visionary minds behind Kanvei s commitment to excellence and innovation
               </p>
             </div>
 
@@ -171,7 +171,7 @@ export default function AboutPage() {
                   Co-Founder & CEO
                 </p>
                 <p className="text-gray-600 leading-relaxed" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                  With a passion for premium quality and customer satisfaction, Adiya leads Kanvei's vision to curate the finest products. Her expertise in business strategy and commitment to excellence drives the company's growth and innovation.
+                  With a passion for premium quality and customer satisfaction, Adiya leads Kanvei s vision to curate the finest products. Her expertise in business strategy and commitment to excellence drives the company s growth and innovation.
                 </p>
               </div>
 
@@ -195,7 +195,7 @@ export default function AboutPage() {
                   Co-Founder & CTO
                 </p>
                 <p className="text-gray-600 leading-relaxed" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                  A technology enthusiast and innovation driver, Raj brings technical excellence to Kanvei's operations. His focus on seamless user experience and cutting-edge solutions ensures our platform delivers exceptional service to every customer.
+                  A technology enthusiast and innovation driver, Raj brings technical excellence to Kanvei s operations. His focus on seamless user experience and cutting-edge solutions ensures our platform delivers exceptional service to every customer.
                 </p>
               </div>
             </div>
@@ -207,7 +207,7 @@ export default function AboutPage() {
                   Our Mission
                 </h3>
                 <p className="text-lg text-gray-700 leading-relaxed" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                  "To create a platform where quality meets passion, where every product tells a story of excellence, and where customer satisfaction is not just a goal but a promise. Together, we're building more than a business – we're crafting experiences that last a lifetime."
+                  To create a platform where quality meets passion, where every product tells a story of excellence, and where customer satisfaction is not just a goal but a promise. Together, we are building more than a business – we are crafting experiences that last a lifetime.
                 </p>
               </div>
             </div>

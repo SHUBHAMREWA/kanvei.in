@@ -183,7 +183,7 @@ export default function ShippingPage() {
                   Order Tracking
                 </h3>
                 <p className="text-gray-700 leading-relaxed">
-                  Once your order is shipped, you'll receive a tracking number via SMS and email. 
+                  Once your order is shipped, you will receive a tracking number via SMS and email. 
                   You can track your order status in real-time through our website or mobile app.
                 </p>
               </div>
@@ -194,7 +194,7 @@ export default function ShippingPage() {
                 </h3>
                 <ul className="space-y-2 text-gray-700">
                   <li>• Delivery timelines are estimates and may vary due to external factors</li>
-                  <li>• We don't ship on Sundays and national holidays</li>
+                  <li>• We do not ship on Sundays and national holidays</li>
                   <li>• For remote locations, additional delivery charges may apply</li>
                   <li>• Large items may require special delivery arrangements</li>
                 </ul>

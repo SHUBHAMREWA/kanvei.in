@@ -67,7 +67,7 @@ export default function SupportPage() {
               Customer Support
             </h1>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto" style={{ fontFamily: "Montserrat, sans-serif" }}>
-              Need help? We're here to assist you. Reach out to us through any of the channels below.
+              Need help? We are here to assist you. Reach out to us through any of the channels below.
             </p>
           </div>
 

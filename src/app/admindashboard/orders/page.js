@@ -470,7 +470,7 @@ export default function AdminOrders() {
               )}
               {customerSearch.trim() && (
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                  Customer: "{customerSearch}"
+                  Customer: {customerSearch}
                 </span>
               )}
             </div>
