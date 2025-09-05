@@ -5,8 +5,9 @@ import FacebookProvider from "next-auth/providers/facebook"
 import bcrypt from "bcryptjs"
 import User from "@/lib/models/User"
 import connectDB from "@/lib/mongodb"
-// import { validateUserNotBlocked } from "../../../lib/auth"
-// import { sendLoginNotificationEmail } from "../../../lib/email"
+import { validateUserNotBlocked } from "@/lib/auth"
+import { sendLoginNotificationEmail } from "@/lib/email"
+import { getClientIP, getUserAgent } from "@/lib/clientInfo"
 
 
 export const authOptions = {
@@ -158,26 +159,30 @@ export const authOptions = {
           }
         }
 
-        // Send login notification email for social logins (but not for new user registrations) - temporarily disabled
-        // if (!isNewUser && (account.provider === "google" || account.provider === "facebook")) {
-        //   const loginType = account.provider === "google" ? "Google" : "Facebook"
-        //   console.log(`📧 Sending ${loginType} login notification to:`, user.email)
-        //   
-        //   try {
-        //     await sendLoginNotificationEmail(
-        //       user.email,
-        //       user.name || "User",
-        //       loginType,
-        //       new Date(),
-        //       'Social Login', // IP not available in this context
-        //       `${loginType} OAuth Login`
-        //     )
-        //     console.log(`✅ ${loginType} login notification sent successfully`)
-        //   } catch (emailError) {
-        //     console.error(`❌ Failed to send ${loginType} login notification:`, emailError)
-        //     // Don't block login if email fails
-        //   }
-        // }
+        // Send login notification for ALL logins (including first-time social logins)
+        const loginType = account.provider === 'google' ? 'Google' : 
+                         account.provider === 'facebook' ? 'Facebook' : 
+                         account.provider === 'credentials' ? 'Email/Password' : 'Unknown'
+        
+        const notificationType = isNewUser ? 'First Time Login' : 'Login'
+        console.log(`📧 Sending ${notificationType.toLowerCase()} notification for ${loginType} login to:`, user.email)
+        
+        try {
+          await sendLoginNotificationEmail(
+            user.email,
+            user.name || "User",
+            loginType,
+            new Date(),
+            'Login Detected', // IP not available in this context
+            `${loginType} ${notificationType}`,
+            isNewUser // Pass isNewUser flag to customize email template
+          )
+          console.log(`✅ ${notificationType} notification sent successfully for ${loginType} login`)
+        } catch (emailError) {
+          console.error(`❌ Failed to send ${notificationType.toLowerCase()} notification:`, emailError)
+          // Don't block login if email fails
+        }
+
 
         return true // allow login
       } catch (error) {

@@ -16,6 +16,9 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url)
     const category = searchParams.get("category")
     const featured = searchParams.get("featured")
+    const page = parseInt(searchParams.get("page")) || 1
+    const limit = parseInt(searchParams.get("limit")) || 0 // 0 means no limit (fetch all)
+    const skip = (page - 1) * limit
 
     const filter = {}
     
@@ -28,13 +31,21 @@ export async function GET(request) {
         filter.categoryId = categoryDoc._id
       } else {
         // If category not found, return empty results
-        return Response.json({ success: true, products: [] })
+        return Response.json({ success: true, products: [], totalCount: 0, hasMore: false })
       }
     }
     
     if (featured) filter.featured = featured === "true"
 
-    const productsFromDB = await Product.find(filter).populate('categoryId', 'name slug').lean()
+    // Get total count for pagination
+    const totalCount = await Product.countDocuments(filter)
+
+    // Build query with pagination
+    let query = Product.find(filter).populate('categoryId', 'name slug')
+    if (limit > 0) {
+      query = query.skip(skip).limit(limit)
+    }
+    const productsFromDB = await query.lean()
 
     // For each product, fetch its images from the ProductImage collection
     const products = await Promise.all(

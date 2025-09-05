@@ -125,18 +125,41 @@ export default function AdminOrders() {
     }
   }
 
-  // Helper function to check if customer matches search
+  // Helper function to get order ID
+  const getOrderId = (order) => {
+    // If order has the new orderId field, use it with a # prefix
+    if (order?.orderId) {
+      return `#${order.orderId}`
+    }
+    // Fallback to formatting the MongoDB _id (for legacy orders)
+    const mongoId = order?._id || order
+    return `#${mongoId.toString().slice(-8).toUpperCase()}`
+  }
+
+  // Helper function to check if order matches search (Order ID, customer name, email, phone)
   const matchesCustomerSearch = (order, searchTerm) => {
     if (!searchTerm.trim()) return true
     
     const search = searchTerm.toLowerCase().trim()
+    
+    // Get Order ID for comparison
+    const orderIdDisplay = getOrderId(order).toLowerCase() // This includes #
+    const orderIdOnly = orderIdDisplay.replace('#', '') // Without #
+    
+    // Customer details
     const customerName = (order.shippingAddress?.name || order.userId?.name || '').toLowerCase()
     const customerEmail = (order.userId?.email || order.customerEmail || '').toLowerCase()
     const customerPhone = (order.shippingAddress?.phone || '').toLowerCase()
     
-    return customerName.includes(search) || 
-           customerEmail.includes(search) || 
-           customerPhone.includes(search)
+    // Check if search matches Order ID (with or without #)
+    const matchesOrderId = orderIdDisplay.includes(search) || orderIdOnly.includes(search)
+    
+    // Check if search matches customer details
+    const matchesCustomer = customerName.includes(search) || 
+                           customerEmail.includes(search) || 
+                           customerPhone.includes(search)
+    
+    return matchesOrderId || matchesCustomer
   }
 
   // Apply all filters
@@ -315,16 +338,6 @@ export default function AdminOrders() {
     }).format(price)
   }
 
-  const getOrderId = (order) => {
-    // If order has the new orderId field, use it with a # prefix
-    if (order?.orderId) {
-      return `#${order.orderId}`
-    }
-    // Fallback to formatting the MongoDB _id (for legacy orders)
-    const mongoId = order?._id || order
-    return `#${mongoId.toString().slice(-8).toUpperCase()}`
-  }
-
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -394,16 +407,16 @@ export default function AdminOrders() {
                 </select>
               </div>
 
-              {/* Customer Search */}
+              {/* Order & Customer Search */}
               <div>
                 <label className="block text-sm font-medium mb-2" style={{ fontFamily: "Montserrat, sans-serif", color: "#5A0117" }}>
-                  Search Customer
+                  Search Order or Customer
                 </label>
                 <input
                   type="text"
                   value={customerSearch}
                   onChange={(e) => setCustomerSearch(e.target.value)}
-                  placeholder="Name, email, or phone..."
+                  placeholder="Order ID (#KNV...), name, email, or phone..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50"
                   style={{ fontFamily: "Montserrat, sans-serif", focusRingColor: "#5A0117" }}
                 />
@@ -470,7 +483,7 @@ export default function AdminOrders() {
               )}
               {customerSearch.trim() && (
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                  Customer: {customerSearch}
+                  Search: {customerSearch}
                 </span>
               )}
             </div>

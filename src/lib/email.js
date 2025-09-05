@@ -150,8 +150,10 @@ export const sendContactEmail = async (name, email, subject, message) => {
 }
 
 // Send login notification email
-export const sendLoginNotificationEmail = async (userEmail, userName, loginType = 'Regular', loginTime, ipAddress = 'Unknown', userAgent = 'Unknown') => {
-  const subject = `🔒 Login Notification - ${loginType} Login Detected`
+export const sendLoginNotificationEmail = async (userEmail, userName, loginType = 'Regular', loginTime, ipAddress = 'Unknown', userAgent = 'Unknown', isNewUser = false) => {
+  const subject = isNewUser ? 
+    `🎉 Welcome to Kanvei! Your ${loginType} Account is Ready` : 
+    `🔒 Login Notification - ${loginType} Login Detected`
   
   const formattedTime = new Date(loginTime).toLocaleString('en-IN', {
     timeZone: 'Asia/Kolkata',
@@ -188,14 +190,17 @@ export const sendLoginNotificationEmail = async (userEmail, userName, loginType 
       <div class="container">
         <div class="header">
           <h1 class="brand-title">Kanvei</h1>
-          <p class="brand-subtitle">Security Alert - Login Notification</p>
+          <p class="brand-subtitle">${isNewUser ? '🎉 Welcome to Kanvei!' : 'Security Alert - Login Notification'}</p>
         </div>
         
         <div class="content">
-          <div class="success-badge">✅ Successful Login</div>
+          <div class="success-badge">${isNewUser ? '🎉 Account Created' : '✅ Successful Login'}</div>
           
           <h2 style="color: #5A0117; margin-bottom: 10px;">Hello ${userName}!</h2>
-          <p style="font-size: 16px; margin-bottom: 25px;">We detected a successful login to your Kanvei account. Here are the details:</p>
+          ${isNewUser ? 
+            `<p style="font-size: 16px; margin-bottom: 25px; color: #22c55e;"><strong>Welcome to Kanvei!</strong> Your account has been successfully created using ${loginType}. We're excited to have you join our community!</p>` :
+            `<p style="font-size: 16px; margin-bottom: 25px;">We detected a successful login to your Kanvei account. Here are the details:</p>`
+          }
           
           <div class="login-details">
             <h3 style="color: #5A0117; margin-top: 0; margin-bottom: 20px;">Login Information</h3>
@@ -226,10 +231,21 @@ export const sendLoginNotificationEmail = async (userEmail, userName, loginType 
             </div>
           </div>
           
-          <div class="security-info">
-            <h4 style="margin-top: 0; color: #1e40af;">🛡️ Security Information</h4>
-            <p style="margin: 0; font-size: 14px;">If this login was made by you, no action is required. If you didn't authorize this login, please contact our support team immediately at <strong>kanvei.in@gmail.com</strong> or call <strong>+91 7488425690</strong>.</p>
-          </div>
+          ${isNewUser ? 
+            `<div style="background-color: #f0f9ff; border-left: 4px solid #22c55e; padding: 20px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+              <h4 style="margin-top: 0; color: #22c55e;">🎉 What's Next?</h4>
+              <ul style="margin: 0; padding-left: 20px; font-size: 14px; color: #333;">
+                <li style="margin-bottom: 8px;">Browse our latest collection of premium fashion items</li>
+                <li style="margin-bottom: 8px;">Add your favorite items to wishlist</li>
+                <li style="margin-bottom: 8px;">Enjoy secure shopping with multiple payment options</li>
+                <li style="margin-bottom: 0;">Get updates on new arrivals and exclusive offers</li>
+              </ul>
+            </div>` :
+            `<div class="security-info">
+              <h4 style="margin-top: 0; color: #1e40af;">🛷️ Security Information</h4>
+              <p style="margin: 0; font-size: 14px;">If this login was made by you, no action is required. If you didn't authorize this login, please contact our support team immediately at <strong>kanvei.in@gmail.com</strong> or call <strong>+91 7488425690</strong>.</p>
+            </div>`
+          }
           
           <p style="margin-top: 25px; font-size: 14px; color: #666;">Thank you for using Kanvei! We're committed to keeping your account secure.</p>
         </div>
