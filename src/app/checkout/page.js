@@ -211,13 +211,43 @@ export default function CheckoutPage() {
 
     try {
       const orderData = {
-        items: items.map((item) => ({
-          productId: item.product?._id || item.productOption?.productId || item.product || item.productOption,
-          name: item.name || item.productSnapshot?.name || item.product?.name || item.productOption?.name,
-          price: item.price,
-          quantity: item.quantity,
-          selectedOption: item.selectedOption // Include selected option if available
-        })),
+        items: items.map((item) => {
+          console.log('🛒 CART ITEM MAPPING:', {
+            itemId: item._id,
+            itemType: item.itemType,
+            isOption: item.isOption,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            productId: item.product?._id,
+            productOptionId: item.productOptionId,
+            size: item.size,
+            color: item.color,
+            fullItem: item
+          })
+          
+          // For product options (from cart with isOption: true)
+          if (item.isOption && item.productOptionId) {
+            return {
+              productId: item.productOption?._id || item.productOptionId,
+              name: item.name,
+              price: item.price,
+              quantity: item.quantity,
+              itemType: 'productOption',
+              size: item.size,
+              color: item.color
+            }
+          }
+          
+          // For main products
+          return {
+            productId: item.product?._id || item._id,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            itemType: 'product'
+          }
+        }),
         totalAmount: getFinalTotal(),
         originalAmount: appliedCoupon ? calculateTotal() : null,
         discountAmount: appliedCoupon ? appliedCoupon.discount.discountAmount : 0,
@@ -266,13 +296,42 @@ export default function CheckoutPage() {
     showError('💳 Payment failed: ' + error)
   }
 
-  const getCartItems = () => items.map((item) => ({
-    productId: item.product?._id || item.productOption?.productId || item.product || item.productOption,
-    name: item.name || item.productSnapshot?.name || item.product?.name || item.productOption?.name,
-    price: item.price,
-    quantity: item.quantity,
-    selectedOption: item.selectedOption // Include selected option if available
-  }))
+  const getCartItems = () => items.map((item) => {
+    console.log('🎁 RAZORPAY CART ITEM MAPPING:', {
+      itemId: item._id,
+      itemType: item.itemType,
+      isOption: item.isOption,
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price,
+      productId: item.product?._id,
+      productOptionId: item.productOptionId,
+      size: item.size,
+      color: item.color
+    })
+    
+    // For product options (from cart with isOption: true)
+    if (item.isOption && item.productOptionId) {
+      return {
+        productId: item.productOption?._id || item.productOptionId,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        itemType: 'productOption',
+        size: item.size,
+        color: item.color
+      }
+    }
+    
+    // For main products
+    return {
+      productId: item.product?._id || item._id,
+      name: item.name,
+      price: item.price,
+      quantity: item.quantity,
+      itemType: 'product'
+    }
+  })
   
   const getOrderData = () => ({
     customerEmail: formData.email,

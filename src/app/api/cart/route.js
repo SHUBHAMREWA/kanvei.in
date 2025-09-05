@@ -4,6 +4,8 @@ import Cart from '../../../lib/models/Cart'
 import CartItem from '../../../lib/models/CartItem'
 import Product from '../../../lib/models/Product'
 import ProductOption from '../../../lib/models/ProductOption'
+import ProductImage from '../../../lib/models/ProductImage'
+import OptionImage from '../../../lib/models/OptionImage'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../auth/[...nextauth]/route'
 import { getAuthUser } from '../../../lib/auth'
@@ -75,7 +77,7 @@ export async function GET(request) {
     }
 
     // Format cart items for frontend display
-    const formattedItems = cart.items.map(item => {
+    const formattedItems = await Promise.all(cart.items.map(async (item) => {
       let formattedItem = {
         _id: item._id,
         quantity: item.quantity,
@@ -85,9 +87,9 @@ export async function GET(request) {
       }
 
       if (item.itemType === 'product' && item.product) {
-        // Main product
-        // Use actual product images - first image from product.images array
-        const productImages = item.product.images || []
+        // Main product - fetch images from ProductImage collection
+        const productImageDoc = await ProductImage.findOne({ productId: item.product._id })
+        const productImages = productImageDoc?.img || []
         const snapshotImage = item.productSnapshot?.image || ''
         
         // Priority: product images -> snapshot image -> no image (will show "No Image" placeholder)
@@ -98,25 +100,19 @@ export async function GET(request) {
           productName: item.product.name,
           
           // Product images debugging
-          productImagesRaw: item.product.images,
-          productImagesType: typeof item.product.images,
-          productImagesIsArray: Array.isArray(item.product.images),
-          productImagesLength: item.product.images ? item.product.images.length : 'NULL',
+          productImageDoc: !!productImageDoc,
           productImagesArray: productImages,
+          productImagesLength: productImages.length,
           firstImage: productImages[0],
           firstImageType: typeof productImages[0],
           
           // Snapshot debugging
-          snapshotRaw: item.productSnapshot,
           snapshotImage: snapshotImage,
-          snapshotImageType: typeof snapshotImage,
           
           // Final result
           finalImageUrl: imageUrl,
-          finalImageType: typeof imageUrl,
           hasImage: !!imageUrl,
-          imageLength: imageUrl ? imageUrl.length : 'NULL',
-          imageStartsWith: imageUrl ? imageUrl.substring(0, 50) + '...' : 'NULL'
+          imageLength: imageUrl ? imageUrl.length : 'NULL'
         })
         
         formattedItem = {
@@ -135,14 +131,36 @@ export async function GET(request) {
           }
         }
       } else if (item.itemType === 'productOption' && item.productOption) {
-        // Product option - use main product name with option details
+        // Product option - fetch images from OptionImage collection
+        const optionImageDoc = await OptionImage.findOne({ optionId: item.productOption._id })
+        const optionImages = optionImageDoc?.img || []
+        
+        // Fallback to main product images if option has no images
+        let imageUrl = optionImages[0]
+        if (!imageUrl && item.productOption.productId) {
+          const productImageDoc = await ProductImage.findOne({ productId: item.productOption.productId._id })
+          const productImages = productImageDoc?.img || []
+          imageUrl = productImages[0] || item.productSnapshot?.image || ''
+        }
+        
         const mainProductName = item.productOption.productId?.name || item.productSnapshot?.name
         const optionDetails = [item.productOption.size, item.productOption.color].filter(Boolean).join(' - ')
+        
+        console.log('🔧 PRODUCT OPTION DEBUG:', {
+          optionId: item.productOption._id,
+          productId: item.productOption.productId?._id,
+          mainProductName: mainProductName,
+          optionDetails: optionDetails,
+          optionImageDoc: !!optionImageDoc,
+          optionImages: optionImages,
+          finalImageUrl: imageUrl,
+          hasImage: !!imageUrl
+        })
         
         formattedItem = {
           ...formattedItem,
           name: optionDetails ? `${mainProductName} - ${optionDetails}` : mainProductName,
-          image: item.productOption.images?.[0] || item.productOption.productId?.images?.[0] || item.productSnapshot?.image,
+          image: imageUrl,
           slug: item.productOption.productId?.slug,
           stock: item.productOption.stock,
           isOption: true,
@@ -159,7 +177,7 @@ export async function GET(request) {
       }
 
       return formattedItem
-    })
+    }))
 
     const formattedCart = {
       items: formattedItems,

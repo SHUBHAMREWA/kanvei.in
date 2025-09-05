@@ -267,6 +267,18 @@ export default function OrderDetailPage({ params }) {
 
                 <div className="space-y-4">
                   {order.items?.map((item, index) => {
+                    // Debug logging for each item
+                    console.log(`📦 ORDER DETAIL - RENDERING ITEM ${index + 1}:`, {
+                      name: item.name,
+                      itemType: item.itemType, 
+                      productId: item.productId?._id,
+                      images: item.productId?.images,
+                      imageCount: item.productId?.images?.length || 0,
+                      clickHref: item.productId?._id ? (item.itemType === 'productOption' ? `/products/option/${item.productId._id}` : `/products/${item.productId?.slug || item.productId._id}`) : 'NO_PRODUCT_ID',
+                      hasProductId: !!item.productId?._id,
+                      fullItem: item
+                    })
+                    
                     // For legacy orders without productId, try to find product by name
                     const hasProductId = item.productId?._id
                     const productName = item.name || item.productId?.name
@@ -277,7 +289,7 @@ export default function OrderDetailPage({ params }) {
                         <div className="w-24 h-24 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
                           {hasProductId ? (
                             <Link 
-                              href={`/products/${item.productId?.slug || item.productId._id}`}
+                              href={item.itemType === 'productOption' ? `/products/option/${item.productId._id}` : `/products/${item.productId?.slug || item.productId._id}`}
                               className="block w-full h-full hover:opacity-90 transition-opacity"
                             >
                               {item.productId?.images && item.productId.images.length > 0 ? (
@@ -316,11 +328,16 @@ export default function OrderDetailPage({ params }) {
                         <div className="flex-1">
                           {hasProductId ? (
                             <Link
-                              href={`/products/${item.productId?.slug || item.productId._id}`}
+                              href={item.itemType === 'productOption' ? `/products/option/${item.productId._id}` : `/products/${item.productId?.slug || item.productId._id}`}
                               className="font-medium mb-1 hover:underline cursor-pointer transition-colors inline-block text-lg"
                               style={{ color: "#5A0117", fontFamily: "Montserrat, sans-serif" }}
                             >
                               {productName}
+                              {item.itemType === 'productOption' && item.productId?.size && item.productId?.color && (
+                                <span className="text-sm font-normal ml-2 text-gray-600">
+                                  ({item.productId.size}, {item.productId.color})
+                                </span>
+                              )}
                             </Link>
                           ) : (
                             <div>
@@ -335,9 +352,9 @@ export default function OrderDetailPage({ params }) {
                           <p className="text-sm mb-1" style={{ color: "#8C6141", fontFamily: "Montserrat, sans-serif" }}>
                             {formatPrice(item.price)} each
                           </p>
-                          {hasProductId && item.productId?.slug && (
+                          {hasProductId && (
                             <p className="text-xs opacity-75" style={{ color: "#8C6141", fontFamily: "Montserrat, sans-serif" }}>
-                              Click image or name to view product details
+                              Click to view {item.itemType === 'productOption' ? 'product option' : 'product'} details
                             </p>
                           )}
                         </div>

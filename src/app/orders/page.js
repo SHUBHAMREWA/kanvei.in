@@ -44,6 +44,8 @@ export default function OrdersPage() {
   const [filteredOrders, setFilteredOrders] = useState([])
   const [statusFilter, setStatusFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [dateFilter, setDateFilter] = useState('all')
+  const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' })
   
   const currentUser = session?.user || authUser
   const isUserAuthenticated = (status === "authenticated") || customAuth
@@ -78,12 +80,62 @@ export default function OrdersPage() {
         }
 
         const userId = currentUser._id || currentUser.id
-        const response = await fetch(`/api/orders?userId=${userId}`, { headers })
+        
+        // Build query parameters
+        const params = new URLSearchParams({ userId })
+        
+        if (statusFilter !== 'all') {
+          params.append('status', statusFilter)
+        }
+        
+        if (dateFilter !== 'all') {
+          params.append('dateFilter', dateFilter)
+          if (dateFilter === 'custom' && customDateRange.start && customDateRange.end) {
+            params.append('startDate', customDateRange.start)
+            params.append('endDate', customDateRange.end)
+          }
+        }
+        
+        const response = await fetch(`/api/orders?${params.toString()}`, { headers })
         const data = await response.json()
 
         if (data.success) {
+          console.log('🚀 FRONTEND API RESPONSE DEBUG:')
+          console.log('Total Orders:', data.orders?.length || 0)
+          
+          // Debug all items in first order
+          if (data.orders?.[0]?.items) {
+            console.log('First Order Items Count:', data.orders[0].items.length)
+            data.orders[0].items.forEach((item, index) => {
+              console.log(`\n📦 Item ${index + 1}:`)  
+              console.log('  - Name:', item.name)
+              console.log('  - ItemType:', item.itemType)
+              console.log('  - ProductId:', item.productId?._id)
+              console.log('  - Product Name:', item.productId?.name) 
+              console.log('  - Images Array:', item.productId?.images)
+              console.log('  - Images Count:', item.productId?.images?.length || 0)
+              console.log('  - Has Images:', (item.productId?.images?.length || 0) > 0)
+              console.log('  - First Image URL:', item.productId?.images?.[0] || 'NO IMAGE')
+              console.log('  - Size:', item.productId?.size)
+              console.log('  - Color:', item.productId?.color)
+              console.log('  - Full Item JSON:', JSON.stringify(item, null, 2))
+            })
+          }
           setOrders(data.orders || [])
-          setFilteredOrders(data.orders || [])
+          // Apply client-side search filter after getting API results
+          let filtered = data.orders || []
+          if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase()
+            filtered = filtered.filter(order => 
+              order._id.toString().toLowerCase().includes(query) ||
+              order.items?.some(item => 
+                item.name?.toLowerCase().includes(query)
+              ) ||
+              order.shippingAddress?.name?.toLowerCase().includes(query) ||
+              order.shippingAddress?.city?.toLowerCase().includes(query)
+            )
+          }
+          setFilteredOrders(filtered)
         } else {
           showError(data.error || 'Failed to fetch orders')
         }
@@ -98,20 +150,13 @@ export default function OrdersPage() {
     if (!loading) {
       fetchOrders()
     }
-  }, [isUserAuthenticated, currentUser, authToken, loading, showError])
+  }, [isUserAuthenticated, currentUser, authToken, loading, showError, statusFilter, dateFilter, customDateRange])
 
-  // Filter orders based on status and search
+  // Apply client-side search filtering only
   useEffect(() => {
     let filtered = [...orders]
 
-    // Filter by status
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(order => 
-        order.status?.toLowerCase() === statusFilter.toLowerCase()
-      )
-    }
-
-    // Filter by search query
+    // Filter by search query (status and date are handled by API)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(order => 
@@ -125,7 +170,7 @@ export default function OrdersPage() {
     }
 
     setFilteredOrders(filtered)
-  }, [orders, statusFilter, searchQuery])
+  }, [orders, searchQuery])
 
   const getStatusInfo = (status) => {
     const statusInfo = ORDER_STATUSES.find(s => 
@@ -222,17 +267,21 @@ export default function OrdersPage() {
 
           {/* Filters and Search */}
           <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <h3 className="text-lg font-semibold mb-4" style={{ fontFamily: "Sugar, serif", color: "#5A0117" }}>
+              Filter & Search Your Orders
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Status Filter */}
               <div>
                 <label className="flex items-center gap-2 text-sm font-medium mb-3" style={{ color: "#5A0117" }}>
                   <AiOutlineFilter className="w-4 h-4" />
-                  Filter by Status
+                  Order Status
                 </label>
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50"
                   style={{ focusRingColor: "#5A0117", fontFamily: "Montserrat, sans-serif" }}
                 >
                   {ORDER_STATUSES.map((status) => (
@@ -240,6 +289,30 @@ export default function OrdersPage() {
                       {status.label}
                     </option>
                   ))}
+                </select>
+              </div>
+
+              {/* Date Filter */}
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium mb-3" style={{ color: "#5A0117" }}>
+                  <AiOutlineCalendar className="w-4 h-4" />
+                  Date Range
+                </label>
+                <select
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50"
+                  style={{ focusRingColor: "#5A0117", fontFamily: "Montserrat, sans-serif" }}
+                >
+                  <option value="all">All Time</option>
+                  <option value="today">Today</option>
+                  <option value="yesterday">Yesterday</option>
+                  <option value="7_days">Last 7 Days</option>
+                  <option value="2_weeks">Last 2 Weeks</option>
+                  <option value="3_weeks">Last 3 Weeks</option>
+                  <option value="1_month">Last Month</option>
+                  <option value="2_months">Last 2 Months</option>
+                  <option value="custom">Custom Range</option>
                 </select>
               </div>
 
@@ -253,38 +326,106 @@ export default function OrdersPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by order ID, product name, or address..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50"
+                  placeholder="Order ID, product, address..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50"
                   style={{ focusRingColor: "#5A0117", fontFamily: "Montserrat, sans-serif" }}
                 />
               </div>
+
+              {/* Clear Filters */}
+              <div className="flex items-end">
+                <button
+                  onClick={() => {
+                    setStatusFilter('all')
+                    setDateFilter('all')
+                    setSearchQuery('')
+                    setCustomDateRange({ start: '', end: '' })
+                  }}
+                  className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                  style={{ fontFamily: "Montserrat, sans-serif" }}
+                >
+                  Clear All
+                </button>
+              </div>
             </div>
 
-            {/* Order Summary */}
-            <div className="mt-6 pt-6 border-t">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center">
-                  <p className="text-2xl font-bold" style={{ color: "#5A0117" }}>{orders.length}</p>
-                  <p className="text-sm" style={{ color: "#8C6141" }}>Total Orders</p>
+            {/* Custom Date Range */}
+            {dateFilter === 'custom' && (
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ fontFamily: "Montserrat, sans-serif", color: "#5A0117" }}>
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={customDateRange.start}
+                    onChange={(e) => setCustomDateRange(prev => ({ ...prev, start: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50"
+                    style={{ fontFamily: "Montserrat, sans-serif", focusRingColor: "#5A0117" }}
+                  />
                 </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-yellow-600">
-                    {orders.filter(o => ['pending', 'processing'].includes(o.status?.toLowerCase())).length}
-                  </p>
-                  <p className="text-sm" style={{ color: "#8C6141" }}>Processing</p>
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ fontFamily: "Montserrat, sans-serif", color: "#5A0117" }}>
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={customDateRange.end}
+                    onChange={(e) => setCustomDateRange(prev => ({ ...prev, end: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50"
+                    style={{ fontFamily: "Montserrat, sans-serif", focusRingColor: "#5A0117" }}
+                  />
                 </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-green-600">
-                    {orders.filter(o => o.status?.toLowerCase() === 'delivered').length}
-                  </p>
-                  <p className="text-sm" style={{ color: "#8C6141" }}>Delivered</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold" style={{ color: "#5A0117" }}>
-                    {filteredOrders.length}
-                  </p>
-                  <p className="text-sm" style={{ color: "#8C6141" }}>Showing</p>
-                </div>
+              </div>
+            )}
+
+            {/* Filter Summary */}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {statusFilter !== 'all' && (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                  Status: {ORDER_STATUSES.find(s => s.value === statusFilter)?.label}
+                </span>
+              )}
+              {dateFilter !== 'all' && (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                  Date: {dateFilter === 'custom' ? 'Custom Range' : dateFilter.replace('_', ' ')}
+                </span>
+              )}
+              {searchQuery.trim() && (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                  Search: {searchQuery}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Order Summary */}
+          <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h3 className="text-lg font-semibold mb-4" style={{ fontFamily: "Sugar, serif", color: "#5A0117" }}>
+              Order Summary
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold" style={{ color: "#5A0117" }}>{orders.length}</p>
+                <p className="text-sm" style={{ color: "#8C6141" }}>Total Orders</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-yellow-600">
+                  {orders.filter(o => ['pending', 'processing'].includes(o.status?.toLowerCase())).length}
+                </p>
+                <p className="text-sm" style={{ color: "#8C6141" }}>Processing</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-green-600">
+                  {orders.filter(o => o.status?.toLowerCase() === 'delivered').length}
+                </p>
+                <p className="text-sm" style={{ color: "#8C6141" }}>Delivered</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold" style={{ color: "#5A0117" }}>
+                  {filteredOrders.length}
+                </p>
+                <p className="text-sm" style={{ color: "#8C6141" }}>Showing</p>
               </div>
             </div>
           </div>
@@ -355,13 +496,25 @@ export default function OrdersPage() {
                     {/* Order Items */}
                     <div className="p-6">
                       <div className="space-y-4">
-                        {order.items?.slice(0, 3).map((item, index) => (
+                        {order.items?.slice(0, 3).map((item, index) => {
+                          console.log(`📦 RENDERING ITEM ${index + 1}:`, {
+                            name: item.name,
+                            itemType: item.itemType, 
+                            productId: item.productId?._id,
+                            images: item.productId?.images,
+                            imageCount: item.productId?.images?.length || 0,
+                            clickHref: item.productId?._id ? (item.itemType === 'productOption' ? `/products/option/${item.productId._id}` : `/products/${item.productId?.slug || item.productId._id}`) : 'NO_PRODUCT_ID',
+                            hasProductId: !!item.productId?._id,
+                            fullItem: item
+                          })
+                          
+                          return (
                           <div key={index} className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors">
                             {/* Product Image - Clickable */}
                             <div className="w-20 h-20 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
-                              {item.productId?._id && (item.productId?.slug || item.productId?._id) ? (
+                              {item.productId?._id ? (
                                 <Link 
-                                  href={`/products/${item.productId?.slug || item.productId._id}`}
+                                  href={item.itemType === 'productOption' ? `/products/option/${item.productId._id}` : `/products/${item.productId?.slug || item.productId._id}`}
                                   className="block w-full h-full hover:opacity-90 transition-opacity"
                                 >
                                   {item.productId?.images && item.productId.images.length > 0 ? (
@@ -394,25 +547,35 @@ export default function OrdersPage() {
                             
                             {/* Product Details */}
                             <div className="flex-1">
-                              {item.productId?._id && (item.productId?.slug || item.productId?._id) ? (
+                              {item.productId?._id ? (
                                 <Link
-                                  href={`/products/${item.productId?.slug || item.productId._id}`}
+                                  href={item.itemType === 'productOption' ? `/products/option/${item.productId._id}` : `/products/${item.productId?.slug || item.productId._id}`}
                                   className="font-medium hover:underline cursor-pointer transition-colors text-lg"
                                   style={{ color: "#5A0117", fontFamily: "Montserrat, sans-serif" }}
                                 >
                                   {item.name || item.productId?.name}
+                                  {item.itemType === 'productOption' && item.productId?.size && item.productId?.color && (
+                                    <span className="text-sm font-normal ml-2 text-gray-600">
+                                      ({item.productId.size}, {item.productId.color})
+                                    </span>
+                                  )}
                                 </Link>
                               ) : (
                                 <h4 className="font-medium text-lg" style={{ color: "#5A0117", fontFamily: "Montserrat, sans-serif" }}>
                                   {item.name}
+                                  {item.size && item.color && (
+                                    <span className="text-sm font-normal ml-2 text-gray-600">
+                                      ({item.size}, {item.color})
+                                    </span>
+                                  )}
                                 </h4>
                               )}
                               <p className="text-sm mt-1" style={{ color: "#8C6141", fontFamily: "Montserrat, sans-serif" }}>
                                 Quantity: <span className="font-medium">{item.quantity}</span> • {formatPrice(item.price)} each
                               </p>
-                              {item.productId?.slug && (
+                              {item.productId?._id && (
                                 <p className="text-xs mt-1 opacity-75" style={{ color: "#8C6141", fontFamily: "Montserrat, sans-serif" }}>
-                                  Click to view product details
+                                  Click to view {item.itemType === 'productOption' ? 'product option' : 'product'} details
                                 </p>
                               )}
                             </div>
@@ -427,7 +590,8 @@ export default function OrdersPage() {
                               </p>
                             </div>
                           </div>
-                        ))}
+                          )
+                        })}
                         
                         {order.items?.length > 3 && (
                           <p className="text-center text-sm py-2" style={{ color: "#8C6141" }}>

@@ -50,7 +50,15 @@ export default function RazorpayButton({ cartItems, orderData, appliedCoupon, fi
                 razorpay_signature: response.razorpay_signature,
                 orderData: {
                   ...orderData,
-                  items: orderResult.validatedItems,
+                  items: orderResult.validatedItems.map(item => ({
+                    productId: item.productId,
+                    name: item.name,
+                    price: item.price,
+                    quantity: item.quantity,
+                    itemType: item.itemType || 'product',
+                    size: item.size,
+                    color: item.color
+                  })),
                   subtotal: orderResult.breakdown.subtotal,
                   shipping: orderResult.breakdown.shipping,
                   taxes: orderResult.breakdown.taxes,

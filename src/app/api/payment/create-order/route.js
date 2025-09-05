@@ -1,6 +1,7 @@
 import Razorpay from "razorpay"
 import connectDB from "../../../../lib/mongodb"
 import Product from "../../../../lib/models/Product"
+import ProductOption from "../../../../lib/models/ProductOption"
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
@@ -32,21 +33,56 @@ export async function POST(request) {
     const validatedItems = []
 
     for (const item of cartItems) {
-      const product = await Product.findById(item.productId)
-      if (!product) {
-        return Response.json({ success: false, error: `Product not found: ${item.productId}` }, { status: 400 })
-      }
-
-      let itemPrice = product.price
+      console.log('💳 PAYMENT CREATE ORDER - VALIDATING ITEM:', {
+        productId: item.productId,
+        itemType: item.itemType,
+        name: item.name,
+        quantity: item.quantity,
+        size: item.size,
+        color: item.color
+      })
       
-      // If item has specific options (size/color), find the option price
-      if (item.selectedOption && product.options && product.options.length > 0) {
-        const option = product.options.find(
-          opt => opt.size === item.selectedOption.size && opt.color === item.selectedOption.color
-        )
-        if (option) {
-          itemPrice = option.price
+      let product, itemPrice, itemName
+      
+      // Check if item is a ProductOption
+      if (item.itemType === 'productOption' || (item.size && item.color)) {
+        // Validate ProductOption
+        const productOption = await ProductOption.findById(item.productId)
+        if (!productOption) {
+          return Response.json({ success: false, error: `Product option not found: ${item.productId}` }, { status: 400 })
         }
+        
+        // Get main product for name
+        const mainProduct = await Product.findById(productOption.productId)
+        if (!mainProduct) {
+          return Response.json({ success: false, error: `Main product not found for option: ${item.productId}` }, { status: 400 })
+        }
+        
+        itemPrice = productOption.price
+        itemName = `${mainProduct.name} - ${productOption.size} - ${productOption.color}`
+        product = { _id: productOption._id, name: itemName }
+        
+        console.log('✅ PRODUCT OPTION VALIDATED:', {
+          optionId: productOption._id,
+          mainProductId: mainProduct._id,
+          name: itemName,
+          price: itemPrice
+        })
+      } else {
+        // Validate main Product
+        product = await Product.findById(item.productId)
+        if (!product) {
+          return Response.json({ success: false, error: `Product not found: ${item.productId}` }, { status: 400 })
+        }
+        
+        itemPrice = product.price
+        itemName = product.name
+        
+        console.log('✅ MAIN PRODUCT VALIDATED:', {
+          productId: product._id,
+          name: itemName,
+          price: itemPrice
+        })
       }
 
       const itemTotal = itemPrice * item.quantity
@@ -54,10 +90,12 @@ export async function POST(request) {
 
       validatedItems.push({
         productId: product._id,
-        name: product.name,
+        name: itemName,
         price: itemPrice,
         quantity: item.quantity,
-        selectedOption: item.selectedOption,
+        itemType: item.itemType || 'product',
+        size: item.size,
+        color: item.color,
         total: itemTotal
       })
     }

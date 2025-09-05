@@ -214,9 +214,29 @@ export default function AdminProducts() {
     }
   }
 
-  const handleEdit = (product) => {
-    setEditingProduct(product)
-    setShowForm(true)
+  const handleEdit = async (product) => {
+    try {
+      // Fetch complete product data with all related collections
+      const token = typeof window !== 'undefined' ? localStorage.getItem('kanvei-token') : null
+      const res = await fetch(`/api/products/${product._id}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      })
+      
+      const data = await res.json()
+      if (data.success) {
+        console.log('📝 Complete product data for editing:', data.product)
+        setEditingProduct(data.product)
+        setShowForm(true)
+      } else {
+        showNotification("Error fetching product details", "error")
+      }
+    } catch (error) {
+      console.error("Error fetching product for edit:", error)
+      showNotification("Error loading product details", "error")
+    }
   }
 
   const handleCancel = () => {

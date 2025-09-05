@@ -2,12 +2,12 @@
 
 import { useCart } from "../contexts/CartContext"
 
-export default function CartSummary({ showCheckoutButton = true, onCheckout }) {
+export default function CartSummary({ showCheckoutButton = true, onCheckout, appliedCoupon, finalTotal }) {
   const { items, getCartTotal } = useCart()
 
   const subtotal = getCartTotal()
   const shipping = 0 // Always free shipping
-  const total = subtotal + shipping
+  const total = finalTotal ? parseFloat(finalTotal) : (subtotal + shipping)
 
   return (
     <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 sticky top-4">
@@ -24,6 +24,12 @@ export default function CartSummary({ showCheckoutButton = true, onCheckout }) {
           <span>Shipping</span>
           <span className="font-medium text-green-600">Free</span>
         </div>
+        {appliedCoupon && (
+          <div className="flex justify-between text-sm sm:text-base" style={{ fontFamily: "Montserrat, sans-serif", color: "#10B981" }}>
+            <span>Coupon Discount ({appliedCoupon.coupon.code})</span>
+            <span className="font-medium">-₹{parseFloat(appliedCoupon.discount.discountAmount).toFixed(2)}</span>
+          </div>
+        )}
         <div className="border-t pt-3">
           <div
             className="flex justify-between text-lg sm:text-xl font-bold"

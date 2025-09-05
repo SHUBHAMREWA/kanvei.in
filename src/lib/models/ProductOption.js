@@ -7,8 +7,7 @@ const ProductOptionSchema = new mongoose.Schema(
     price: { type: Number },
     mrp: { type: Number },
     color: { type: String, trim: true },
-    stock: { type: Number, default: 0 },
-    images: [{ type: String }]
+    stock: { type: Number, default: 0 }
   },
   { timestamps: true },
 )

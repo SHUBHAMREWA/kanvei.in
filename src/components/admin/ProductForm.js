@@ -34,7 +34,8 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
   })
   const [categoriesHierarchy, setCategoriesHierarchy] = useState([])
   const [loading, setLoading] = useState(false)
-  const [step, setStep] = useState((product?.category || product?.categoryId) ? 2 : 1)
+  // For editing, always start at step 2 (product details), for new products start at step 1 (category selection)
+  const [step, setStep] = useState(product ? 2 : 1)
 
   const getCategoryNameById = (id, list = categoriesHierarchy) => {
     if (!id) return ""
@@ -112,6 +113,7 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
       }))
 
       const optionsArray = (formData.options || []).map((opt) => ({
+        ...(opt._id && { _id: opt._id }), // Preserve existing option ID
         size: opt.size || "",
         price: opt.price === "" ? 0 : Number.parseFloat(opt.price),
         mrp: opt.mrp === "" ? 0 : Number.parseFloat(opt.mrp),
@@ -544,7 +546,7 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
                   type="button"
                   onClick={() => setFormData({
                     ...formData,
-                    options: [...(formData.options || []), { size: '', price: '', mrp: '', color: '', stock: '' }],
+                    options: [...(formData.options || []), { size: '', price: '', mrp: '', color: '', stock: '', images: [] }],
                   })}
                   className="px-3 py-1 text-white text-sm font-semibold rounded-lg hover:opacity-90 transition-opacity"
                   style={{ backgroundColor: '#5A0117', fontFamily: 'Montserrat, sans-serif' }}

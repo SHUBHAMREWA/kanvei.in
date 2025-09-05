@@ -1,24 +1,5 @@
 import mongoose from "mongoose"
 
-const AttributeSchema = new mongoose.Schema(
-  {
-    name: { type: String, trim: true },
-    type: { type: String, trim: true },
-  },
-  { _id: false },
-)
-
-const OptionSchema = new mongoose.Schema(
-  {
-    size: { type: String, trim: true },
-    price: { type: Number },
-    mrp: { type: Number },
-    color: { type: String, trim: true },
-    stock: { type: Number, default: 0 },
-  },
-  { _id: false },
-)
-
 const ProductSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -31,14 +12,9 @@ const ProductSchema = new mongoose.Schema(
     width: { type: Number },
     mrp: { type: Number },
     price: { type: Number, required: true },
-    category: { type: String, trim: true },
-    categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Category", default: null },
+    categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Category", required: true },
     stock: { type: Number, default: 0 },
-    featured: { type: Boolean, default: false },
-    images: [{ type: String }],
-    attributes: [AttributeSchema],
-    options: [OptionSchema],
-    views: { type: Number, default: 0 }
+    featured: { type: Boolean, default: false }
   },
   { timestamps: true },
 )

@@ -233,7 +233,7 @@ export default function AdminCoupons() {
                           {coupon.description}
                         </p>
                         
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                           <div>
                             <span className="font-semibold" style={{ color: "#5A0117" }}>Discount:</span>
                             <br />
@@ -243,19 +243,14 @@ export default function AdminCoupons() {
                             }
                           </div>
                           <div>
-                            <span className="font-semibold" style={{ color: "#5A0117" }}>Min Order:</span>
+                            <span className="font-semibold" style={{ color: "#5A0117" }}>Min Order Amount (₹):</span>
                             <br />
-                            ₹{coupon.minOrderAmount}
-                          </div>
-                          <div>
-                            <span className="font-semibold" style={{ color: "#5A0117" }}>Valid Until:</span>
-                            <br />
-                            {formatDate(coupon.validTo)}
+                            ₹{coupon.minimumOrderAmount || 0}
                           </div>
                           <div>
                             <span className="font-semibold" style={{ color: "#5A0117" }}>Used:</span>
                             <br />
-                            {coupon.usedCount}/{coupon.usageLimit || '∞'}
+                            {coupon.usageCount || 0}/{coupon.usageLimit || '∞'}
                           </div>
                         </div>
                       </div>
@@ -283,15 +278,13 @@ export default function AdminCoupons() {
                         >
                           {coupon.isActive ? 'Deactivate' : 'Activate'}
                         </button>
-                        {coupon.usedCount === 0 && (
-                          <button
-                            onClick={() => handleDelete(coupon._id)}
-                            className="px-3 py-2 text-sm bg-red-600 text-white font-semibold rounded-md hover:bg-red-700 transition-colors"
-                            style={{ fontFamily: "Montserrat, sans-serif" }}
-                          >
-                            Delete
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleDelete(coupon._id)}
+                          className="px-3 py-2 text-sm bg-red-600 text-white font-semibold rounded-md hover:bg-red-700 transition-colors"
+                          style={{ fontFamily: "Montserrat, sans-serif" }}
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
                   </div>

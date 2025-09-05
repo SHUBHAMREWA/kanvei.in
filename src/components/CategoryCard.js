@@ -37,7 +37,7 @@ export default function CategoryCard({ category }) {
         <div className="hidden md:block absolute left-0 right-0 top-full  opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-200 z-10">
           <div className="bg-white rounded-lg shadow-lg p-3 grid grid-cols-1 gap-1">
             {category.subcategories.map((child) => (
-              <Link key={child._id} href={`/categories/${child.slug || child._id}`} className="flex items-center gap-3 p-2 rounded hover:bg-gray-50">
+              <Link key={child._id} href={`/categories/${category.slug}/${child.slug || child._id}`} className="flex items-center gap-3 p-2 rounded hover:bg-gray-50">
                 {child.image && (
                   <img src={child.image} alt={child.name} className="w-10 h-10 rounded object-cover" />
                 )}
@@ -72,7 +72,7 @@ export default function CategoryCard({ category }) {
           {open && (
             <div className="mt-2 bg-white text-[10px] rounded-lg shadow p-3 grid grid-cols-1 gap-3">
               {category.subcategories.map((child) => (
-                <Link key={child._id} href={`/categories/${child.slug || child._id}`} className="flex items-center gap-3 p-2 rounded hover:bg-gray-50">
+                <Link key={child._id} href={`/categories/${category.slug}/${child.slug || child._id}`} className="flex items-center gap-3 p-2 rounded hover:bg-gray-50">
                   {child.image && (
                     <img src={child.image} alt={child.name} className="w-10 h-10 rounded object-cover" />
                   )}
