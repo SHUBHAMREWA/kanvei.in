@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server"
-import connectDB from "../../../../lib/mongodb"
-import User from "../../../../lib/models/User"
+import connectDB from "@/lib/mongodb"
+import User from "@/lib/models/User"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
-import { validateUserNotBlocked } from "../../../../lib/auth"
+import { validateUserNotBlocked } from "@/lib/auth"
+import { sendLoginNotificationEmail } from "@/lib/email"
+import { getClientIP, getUserAgent } from "@/lib/clientInfo"
 
 export async function POST(request) {
   try {
@@ -52,6 +54,28 @@ export async function POST(request) {
 
     // Generate token
     const token = jwt.sign({ userId: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: "7d" })
+
+    // Send welcome email for new registration
+    const clientIP = getClientIP(request)
+    const userAgent = getUserAgent(request)
+    const registrationTime = new Date()
+    
+    try {
+      console.log('📧 Sending welcome email for new registration to:', email)
+      await sendLoginNotificationEmail(
+        email,
+        name,
+        'Email/Password',
+        registrationTime,
+        clientIP,
+        userAgent,
+        true // isNewUser = true for registration
+      )
+      console.log('✅ Welcome email sent successfully for new registration')
+    } catch (emailError) {
+      console.error('❌ Failed to send welcome email:', emailError)
+      // Don't block registration if email fails
+    }
 
     // Remove password from response
     const userResponse = {

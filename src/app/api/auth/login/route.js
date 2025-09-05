@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server"
-import connectDB from "../../../../lib/mongodb"
-import User from "../../../../lib/models/User"
+import connectDB from "@/lib/mongodb"
+import User from "@/lib/models/User"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
-import { validateUserNotBlocked } from "../../../../lib/auth"
-import { sendLoginNotificationEmail, sendAdminLoginNotificationEmail } from "../../../../lib/email"
-import { getClientIP, getUserAgent } from "../../../../lib/clientInfo"
+import { validateUserNotBlocked } from "@/lib/auth"
+import { sendLoginNotificationEmail, sendAdminLoginNotificationEmail } from "@/lib/email"
+import { getClientIP, getUserAgent } from "@/lib/clientInfo"
 
 export async function POST(request) {
   try {

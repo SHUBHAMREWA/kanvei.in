@@ -19,10 +19,10 @@ export default function CategoryCard({ category }) {
               className="object-cover transition-transform duration-500 brightness-75 group-hover:scale-105"
             />
             <div className="absolute inset-0 bg-black/40 group-hover:bg-black/30 transition-all duration-500"></div>
-            <div className="absolute inset-0 flex items-center justify-center transition-all duration-500">
+            <div className="absolute inset-0 flex items-center justify-center transition-all duration-500 p-2">
               <h3
-                className="text-3xl font-extrabold text-white drop-shadow-lg tracking-wide transform 
-                           transition-all duration-500 group-hover:translate-y-20"
+                className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-white drop-shadow-lg tracking-wide transform 
+                           transition-all duration-500 group-hover:translate-y-20 text-center leading-tight"
                 style={{ fontFamily: "Sugar, serif" }}
               >
                 {category.name}
@@ -60,23 +60,22 @@ export default function CategoryCard({ category }) {
               e.stopPropagation()
               setOpen((v) => !v)
             }}
-            className="w-full px-4 text-center border rounded-lg text-[10px] font-medium"
+            className="w-full px-3 py-2 text-center border rounded-lg text-xs font-medium transition-colors duration-200 hover:bg-gray-50"
             style={{ borderColor: "#AFABAA", color: "#5A0117", fontFamily: "Montserrat, sans-serif" }}
             aria-expanded={open}
           >
-            {!open ? <span className="flex justify-center items-center gap-1"><LiaToggleOffSolid/>showMore</span>  
-             : <span className="flex justify-center items-center gap-1"><LiaToggleOnSolid/>hide</span> }
-       
+            {!open ? <span className="flex justify-center items-center gap-1"><LiaToggleOffSolid className="text-sm"/>Show More</span>  
+             : <span className="flex justify-center items-center gap-1"><LiaToggleOnSolid className="text-sm"/>Hide</span> }
           </button>
 
           {open && (
-            <div className="mt-2 bg-white text-[10px] rounded-lg shadow p-3 grid grid-cols-1 gap-3">
+            <div className="mt-2 bg-white rounded-lg shadow p-3 grid grid-cols-1 gap-2">
               {category.subcategories.map((child) => (
-                <Link key={child._id} href={`/categories/${category.slug}/${child.slug || child._id}`} className="flex items-center gap-3 p-2 rounded hover:bg-gray-50">
+                <Link key={child._id} href={`/categories/${category.slug}/${child.slug || child._id}`} className="flex items-center gap-3 p-2 rounded hover:bg-gray-50 transition-colors duration-200">
                   {child.image && (
-                    <img src={child.image} alt={child.name} className="w-10 h-10 rounded object-cover" />
+                    <img src={child.image} alt={child.name} className="w-8 h-8 rounded object-cover" />
                   )}
-                  <span className="text-[10px] font-medium" style={{ fontFamily: "Montserrat, sans-serif", color: "#5A0117" }}>
+                  <span className="text-xs font-medium" style={{ fontFamily: "Montserrat, sans-serif", color: "#5A0117" }}>
                     {child.name}
                   </span>
                 </Link>

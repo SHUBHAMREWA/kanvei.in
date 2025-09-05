@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import ProductDetailClient from '../../../components/ProductDetailClient'
 import connectDB from '../../../lib/mongodb'
 import Product from '../../../lib/models/Product'
+import Category from '../../../lib/models/Category'
 import ProductImage from '../../../lib/models/ProductImage'
 import ProductAttribute from '../../../lib/models/ProductAttribute'
 import ProductOption from '../../../lib/models/ProductOption'
@@ -45,18 +46,12 @@ async function getProduct(slug) {
       })
     )
     
-    // Get product views
+    // Get product views (read-only on server)
     const productViews = await ProductView.findOne({ productId: product._id }).lean()
     
-    // Increment view count
-    if (productViews) {
-      await ProductView.findOneAndUpdate(
-        { productId: product._id },
-        { $inc: { views: 1 } }
-      )
-    } else {
-      await ProductView.create({ productId: product._id, views: 1 })
-    }
+    // NOTE: Do not increment views on the server here.
+    // In production, this page may be statically generated or cached,
+    // causing the increment to not run per-request. We'll increment from the client via API.
     
     return {
       ...product,
@@ -76,7 +71,7 @@ async function getProduct(slug) {
         _id: opt._id.toString(),
         productId: opt.productId.toString()
       })) || [],
-      views: productViews ? productViews.views + 1 : 1,
+      views: productViews ? productViews.views : 0,
       category: product.categoryId?.name || '',
       categorySlug: product.categoryId?.slug || ''
     }
@@ -88,7 +83,8 @@ async function getProduct(slug) {
 
 // Generate metadata for SEO
 export async function generateMetadata({ params }) {
-  const product = await getProduct(params.id)
+  const { id } = await params
+  const product = await getProduct(id)
   
   if (!product) {
     return {
@@ -168,7 +164,8 @@ export async function generateStaticParams() {
 
 // Main server component
 export default async function ProductPage({ params }) {
-  const product = await getProduct(params.id)
+  const { id } = await params
+  const product = await getProduct(id)
   
   if (!product) {
     notFound()

@@ -38,6 +38,23 @@ export default function ProductDetailClient({ product: initialProduct }) {
   const { user, isAuthenticated } = useAuth()
   const { showSuccess, showError, showInfo } = useToast()
 
+  // Increment product views on mount (works for both slug or ObjectId)
+  useEffect(() => {
+    const incrementViews = async () => {
+      try {
+        if (!params.id) return
+        const res = await fetch(`/api/products/${params.id}/views`, { method: 'POST' })
+        const data = await res.json()
+        if (data?.success) {
+          setProduct((prev) => prev ? { ...prev, views: data.views } : prev)
+        }
+      } catch (err) {
+        console.error('Error incrementing product views:', err)
+      }
+    }
+    incrementViews()
+  }, [params.id])
+
   // Fetch reviews on component mount
   useEffect(() => {
     const fetchReviews = async () => {
@@ -73,7 +90,13 @@ export default function ProductDetailClient({ product: initialProduct }) {
     setQuantity(1)
   }
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
+    // Check if user is authenticated first
+    if (!isAuthenticated || !user) {
+      showInfo("Please login to add items to cart", 4000)
+      return
+    }
+    
     const availableStock = getAvailableStock()
     const maxQuantityToAdd = Math.min(quantity, availableStock)
     
@@ -100,15 +123,18 @@ export default function ProductDetailClient({ product: initialProduct }) {
       }
       
       // Add to cart with option if selected
-      addToCart(product, maxQuantityToAdd, selectedOption);
+      const success = await addToCart(product, maxQuantityToAdd, selectedOption);
       
-      const optionText = selectedOptionValues.length > 0 
-        ? ` (${selectedOptionValues.map(opt => `${opt.size || opt.color || opt.name}`).join(', ')})` 
-        : ''
-      showSuccess(`Added ${maxQuantityToAdd} ${product.name}${optionText} to cart`, 4000);
-      
-      // Reset quantity after successful add
-      setQuantity(1)
+      // Only show success message and reset quantity if actually added to cart
+      if (success) {
+        const optionText = selectedOptionValues.length > 0 
+          ? ` (${selectedOptionValues.map(opt => `${opt.size || opt.color || opt.name}`).join(', ')})` 
+          : ''
+        showSuccess(`Added ${maxQuantityToAdd} ${product.name}${optionText} to cart`, 4000);
+        
+        // Reset quantity after successful add
+        setQuantity(1)
+      }
     }
   }
 
@@ -300,19 +326,27 @@ export default function ProductDetailClient({ product: initialProduct }) {
   }
 
   // Handle Buy Now functionality
-  const handleBuyNow = () => {
+  const handleBuyNow = async () => {
+    // Check if user is authenticated first
+    if (!isAuthenticated || !user) {
+      showInfo("Please login to proceed with purchase", 4000)
+      return
+    }
+    
     if (currentStock === 0 || availableStock === 0) {
       showError("Product is out of stock", 3000)
       return
     }
 
     // First add to cart, then redirect to checkout
-    handleAddToCart()
+    const success = await handleAddToCart()
     
-    // Redirect to checkout page after a short delay
-    setTimeout(() => {
-      window.location.href = '/checkout'
-    }, 1000)
+    // Only redirect if successfully added to cart
+    if (success) {
+      setTimeout(() => {
+        window.location.href = '/checkout'
+      }, 1000)
+    }
   }
 
   // Handle Share functionality
@@ -537,7 +571,7 @@ export default function ProductDetailClient({ product: initialProduct }) {
               <div className="relative">
                 <div 
                   ref={imageContainerRef}
-                  className="aspect-square rounded-lg overflow-hidden border-2 border-gray-200 relative cursor-zoom-in"
+                  className="aspect-square rounded-lg overflow-hidden border-2 border-gray-200 relative cursor-zoom-in max-w-sm mx-auto lg:max-w-md xl:max-w-lg"
                   onMouseEnter={handleMouseEnter}
                   onMouseLeave={handleMouseLeave}
                   onMouseMove={handleMouseMove}
@@ -639,43 +673,45 @@ export default function ProductDetailClient({ product: initialProduct }) {
                       {activeImageIndex + 1} / {currentImages.length}
                     </div>
                   )}
-                </div>
-                
-                {/* Views Counter */}
-                <div className="absolute bottom-3 left-3 bg-white bg-opacity-90 px-3 py-2 rounded-full flex items-center gap-2 shadow-md">
-                  <AiOutlineEye className="w-4 h-4" style={{ color: "#8C6141" }} />
-                  <span className="text-sm font-medium" style={{ color: "#5A0117" }}>
-                    {product.views ? product.views.toLocaleString() : 0} views
-                  </span>
+                  
+                  {/* Views Counter */}
+                  <div className="absolute bottom-3 left-3 bg-white bg-opacity-90 px-3 py-2 rounded-full flex items-center gap-2 shadow-md">
+                    <AiOutlineEye className="w-4 h-4" style={{ color: "#8C6141" }} />
+                    <span className="text-sm font-medium" style={{ color: "#5A0117" }}>
+                      {product.views ? product.views.toLocaleString() : 0} views
+                    </span>
+                  </div>
                 </div>
               </div>
               
               {/* Thumbnail Images */}
               {currentImages && currentImages.length > 1 && (
-                <div className="grid grid-cols-5 sm:grid-cols-5 md:grid-cols-6 gap-2">
-                  {currentImages.map((image, index) => (
-                    <button
-                      key={`thumb-${index}-${JSON.stringify(selectedOptions)}`}
-                      onClick={() => setActiveImageIndex(index)}
-                      className={`aspect-square rounded-md overflow-hidden border-2 transition-all ${
-                        index === activeImageIndex 
-                          ? 'border-opacity-100 ring-2 ring-offset-1' 
-                          : 'border-opacity-30 hover:border-opacity-60'
-                      }`}
-                      style={{ 
-                        borderColor: "#5A0117",
-                        ringColor: index === activeImageIndex ? "#5A0117" : "transparent"
-                      }}
-                    >
-                      <Image
-                        src={image || "/placeholder.svg"}
-                        alt={`${product.name} thumbnail ${index + 1}`}
-                        width={80}
-                        height={80}
-                        className="object-cover w-full h-full"
-                      />
-                    </button>
-                  ))}
+                <div className="flex justify-center">
+                  <div className="grid grid-cols-5 sm:grid-cols-5 md:grid-cols-6 gap-2 max-w-sm mx-auto lg:max-w-md xl:max-w-lg">
+                    {currentImages.map((image, index) => (
+                      <button
+                        key={`thumb-${index}-${JSON.stringify(selectedOptions)}`}
+                        onClick={() => setActiveImageIndex(index)}
+                        className={`aspect-square rounded-md overflow-hidden border-2 transition-all ${
+                          index === activeImageIndex 
+                            ? 'border-opacity-100 ring-2 ring-offset-1' 
+                            : 'border-opacity-30 hover:border-opacity-60'
+                        }`}
+                        style={{ 
+                          borderColor: "#5A0117",
+                          ringColor: index === activeImageIndex ? "#5A0117" : "transparent"
+                        }}
+                      >
+                        <Image
+                          src={image || "/placeholder.svg"}
+                          alt={`${product.name} thumbnail ${index + 1}`}
+                          width={80}
+                          height={80}
+                          className="object-cover w-full h-full"
+                        />
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -1050,6 +1086,138 @@ export default function ProductDetailClient({ product: initialProduct }) {
                 </div>
               )}
 
+              {/* Mobile Action Buttons - Below Description */}
+              <div className="sm:hidden space-y-4">
+                {/* Quantity Selector for Mobile */}
+                {currentStock > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium mb-2" style={{ color: "#5A0117" }}>
+                      Quantity:
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        disabled={quantity <= 1}
+                        className="w-10 h-10 border-2 rounded-lg flex items-center justify-center hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        style={{ borderColor: "#5A0117", color: "#5A0117" }}
+                      >
+                        −
+                      </button>
+                      <span className="text-lg font-semibold px-4" style={{ color: "#5A0117" }}>
+                        {quantity}
+                      </span>
+                      <button
+                        onClick={() => setQuantity(Math.min(availableStock, quantity + 1))}
+                        disabled={quantity >= availableStock}
+                        className="w-10 h-10 border-2 rounded-lg flex items-center justify-center hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        style={{ borderColor: "#5A0117", color: "#5A0117" }}
+                      >
+                        +
+                      </button>
+                      
+                      {/* Stock info for mobile */}
+                      <div className="ml-3 text-sm">
+                        {quantity >= availableStock && availableStock > 0 && (
+                          <span className="text-orange-600" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                            Max available
+                          </span>
+                        )}
+                        
+                        {availableStock === 0 && (
+                          <span className="text-red-600" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                            No more available
+                          </span>
+                        )}
+                        
+                        {availableStock > 0 && quantity < availableStock && (
+                          <span className="text-gray-500" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                            {availableStock} available
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Primary Action Button - Add to Cart */}
+                <button
+                  onClick={handleAddToCart}
+                  disabled={currentStock === 0 || availableStock === 0}
+                  className="w-full py-4 px-8 text-white font-bold text-lg rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 shadow-lg hover:shadow-xl"
+                  style={{ backgroundColor: "#5A0117" }}
+                >
+                  {currentStock === 0 
+                    ? 'Out of Stock' 
+                    : availableStock === 0 
+                    ? 'No More Available'
+                    : isInCart 
+                    ? `Add ${maxQuantityToAdd} More to Cart`
+                    : `Add ${maxQuantityToAdd} to Cart`
+                  }
+                </button>
+                
+                {/* Secondary Actions - Buy Now (Full Width) */}
+                <button
+                  onClick={handleBuyNow}
+                  disabled={currentStock === 0 || availableStock === 0}
+                  className="w-full flex items-center justify-center gap-2 py-4 px-6 text-white font-bold text-lg rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 shadow-lg hover:shadow-xl"
+                  style={{ backgroundColor: "#FF6B35" }}
+                >
+                  <BsLightning className="w-5 h-5" />
+                  {currentStock === 0 
+                    ? 'Out of Stock' 
+                    : availableStock === 0 
+                    ? 'No More Available'
+                    : 'Buy Now'
+                  }
+                </button>
+                
+                {/* Wishlist and Share - Side by Side */}
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    onClick={handleWishlistToggle}
+                    className={`flex items-center justify-center gap-2 px-4 py-3 border-2 rounded-lg transition-all font-semibold ${
+                      isInWishlist ? 'text-red-500 border-red-500 bg-red-50' : 'hover:bg-gray-50'
+                    }`}
+                    style={{
+                      borderColor: isInWishlist ? '#ef4444' : '#8C6141',
+                      color: isInWishlist ? '#ef4444' : '#8C6141'
+                    }}
+                  >
+                    <AiOutlineHeart className={`w-5 h-5 ${isInWishlist ? 'fill-current' : ''}`} />
+                    <span className="text-sm">
+                      {isInWishlist ? 'Remove' : 'Wishlist'}
+                    </span>
+                  </button>
+                  
+                  <button
+                    onClick={handleShare}
+                    className="flex items-center justify-center gap-2 px-4 py-3 border-2 rounded-lg transition-all hover:bg-gray-50 font-semibold"
+                    style={{
+                      borderColor: '#8C6141',
+                      color: '#8C6141'
+                    }}
+                  >
+                    <IoMdShareAlt className="w-5 h-5" />
+                    <span className="text-sm">Share</span>
+                  </button>
+                </div>
+                
+                {/* Mobile Cart Info */}
+                {isInCart && (
+                  <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                    <p className="text-sm font-medium text-green-700" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                      ✓ {cartQuantity} item(s) already in cart
+                      {Object.values(selectedOptions).filter(Boolean).length > 0 && (
+                        <span className="ml-2 text-xs">
+                          ({Object.values(selectedOptions).filter(Boolean).map(opt => opt.size || opt.color || opt.name).join(', ')})
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                )}
+              </div>
+
               {/* Show current cart info if item is in cart */}
               {isInCart && (
                 <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
@@ -1132,6 +1300,22 @@ export default function ProductDetailClient({ product: initialProduct }) {
                       : isInCart 
                       ? `Add ${maxQuantityToAdd} More to Cart`
                       : `Add ${maxQuantityToAdd} to Cart`
+                    }
+                  </button>
+                  
+                  {/* Buy Now Button - Desktop (Full Width) */}
+                  <button
+                    onClick={handleBuyNow}
+                    disabled={currentStock === 0 || availableStock === 0}
+                    className="w-full flex items-center justify-center gap-2 py-4 px-8 text-white font-bold text-lg rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 shadow-lg hover:shadow-xl"
+                    style={{ backgroundColor: "#FF6B35" }}
+                  >
+                    <BsLightning className="w-5 h-5" />
+                    {currentStock === 0 
+                      ? 'Out of Stock' 
+                      : availableStock === 0 
+                      ? 'No More Available'
+                      : 'Buy Now'
                     }
                   </button>
                   

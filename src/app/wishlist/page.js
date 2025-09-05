@@ -210,24 +210,8 @@ export default function WishlistPage() {
                   {contextWishlist
                     .filter((item) => item?.productId)
                     .map((item) => (
-                      <div key={item._id} className="relative group">
+                      <div key={item._id}>
                         <ProductCard product={item.productId} />
-                        <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => handleAddToCart(item.productId)}
-                            className="px-3 py-1 rounded-md text-sm bg-white border hover:bg-gray-50"
-                            title="Add to cart"
-                          >
-                            Add to Cart
-                          </button>
-                          <button
-                            onClick={() => handleRemoveFromWishlist(item.productId._id)}
-                            className="px-3 py-1 rounded-md text-sm bg-white border hover:bg-gray-50"
-                            title="Remove from wishlist"
-                          >
-                            Remove
-                          </button>
-                        </div>
                       </div>
                     ))}
                 </div>

@@ -48,13 +48,13 @@ export default function CategoriesPage() {
         <section className="py-12 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto">
             {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
                 {[...Array(6)].map((_, i) => (
-                  <div key={i} className="bg-gray-200 rounded-lg h-64 animate-pulse"></div>
+                  <div key={i} className="bg-gray-200 rounded-lg h-48 sm:h-56 lg:h-64 animate-pulse"></div>
                 ))}
               </div>
             ) : categories.length > 0 ? (
-              <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
                 {categories.map((category) => (
                   <CategoryCard key={category._id} category={category} />
                 ))}
