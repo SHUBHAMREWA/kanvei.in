@@ -891,62 +891,89 @@ export default function AdminOrders() {
                       <div className="space-y-3">
                         {selectedOrder.items?.map((item, index) => (
                           <div key={index} className="flex items-center gap-4 bg-white rounded-lg p-3">
-                            {/* Product Image */}
-                            <div className="w-16 h-16 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
+                        {/* Product Image */}
+                        <div className="w-16 h-16 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
+                          {item.productId?._id ? (
+                            <Link 
+                              href={item.itemType === 'productOption' ? `/products/option/${item.productId._id}` : `/products/${item.productId?.slug || item.productId._id}`}
+                              className="block w-full h-full hover:opacity-90 transition-opacity"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
                               {item.productId?.images && item.productId.images.length > 0 ? (
                                 <img
                                   src={item.productId.images[0]}
                                   alt={item.name || item.productId?.name}
-                                  className="w-full h-full object-cover"
+                                  className="w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer"
                                   onError={(e) => {
                                     e.target.style.display = 'none'
                                     e.target.nextSibling.style.display = 'flex'
                                   }}
                                 />
-                              ) : null}
-                              <div className="w-full h-full flex items-center justify-center" style={{
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gray-200 hover:bg-gray-300 transition-colors cursor-pointer">
+                                  <AiOutlineShop className="w-6 h-6" style={{ color: "#8C6141" }} />
+                                </div>
+                              )}
+                              <div className="w-full h-full flex items-center justify-center bg-gray-200 hover:bg-gray-300 transition-colors cursor-pointer" style={{
                                 display: item.productId?.images && item.productId.images.length > 0 ? 'none' : 'flex'
                               }}>
                                 <AiOutlineShop className="w-6 h-6" style={{ color: "#8C6141" }} />
                               </div>
+                            </Link>
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                              <AiOutlineShop className="w-6 h-6" style={{ color: "#8C6141" }} />
                             </div>
-                            
-                            {/* Product Details */}
-                            <div className="flex-1">
-                              {item.productId?._id ? (
-                                <Link
-                                  href={`/products/${item.productId._id}`}
-                                  className="font-medium hover:underline cursor-pointer transition-colors inline-block"
-                                  style={{ fontFamily: "Montserrat, sans-serif", color: "#5A0117" }}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  {item.name || item.productId?.name || 'Product Name'}
-                                </Link>
-                              ) : (
-                                <h6 className="font-medium" style={{ fontFamily: "Montserrat, sans-serif", color: "#5A0117" }}>
-                                  {item.name || item.product?.name || 'Product Name'}
-                                </h6>
+                          )}
+                        </div>
+                        
+                        {/* Product Details */}
+                        <div className="flex-1">
+                          {item.productId?._id ? (
+                            <Link
+                              href={item.itemType === 'productOption' ? `/products/option/${item.productId._id}` : `/products/${item.productId?.slug || item.productId._id}`}
+                              className="font-medium hover:underline cursor-pointer transition-colors inline-block"
+                              style={{ fontFamily: "Montserrat, sans-serif", color: "#5A0117" }}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {item.name || item.productId?.name || 'Product Name'}
+                              {item.itemType === 'productOption' && item.productId?.size && item.productId?.color && (
+                                <span className="text-sm font-normal ml-2 text-gray-600">
+                                  ({item.productId.size}, {item.productId.color})
+                                </span>
                               )}
-                              <div className="text-sm text-gray-600 mt-1" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                                <span>Quantity: {item.quantity}</span>
-                                <span className="mx-2">•</span>
-                                <span>Price: {formatPrice(item.price)}</span>
-                              </div>
-                              {item.productId?._id && (
-                                <div className="mt-1">
-                                  <Link
-                                    href={`/products/${item.productId._id}`}
-                                    className="text-xs px-2 py-1 border rounded hover:bg-gray-50 transition-colors inline-block"
-                                    style={{ color: "#8C6141", borderColor: "#8C6141" }}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                  >
-                                    View Product →
-                                  </Link>
-                                </div>
+                            </Link>
+                          ) : (
+                            <h6 className="font-medium" style={{ fontFamily: "Montserrat, sans-serif", color: "#5A0117" }}>
+                              {item.name || item.product?.name || 'Product Name'}
+                              {item.size && item.color && (
+                                <span className="text-sm font-normal ml-2 text-gray-600">
+                                  ({item.size}, {item.color})
+                                </span>
                               )}
+                            </h6>
+                          )}
+                          <div className="text-sm text-gray-600 mt-1" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                            <span>Quantity: {item.quantity}</span>
+                            <span className="mx-2">•</span>
+                            <span>Price: {formatPrice(item.price)}</span>
+                          </div>
+                          {item.productId?._id && (
+                            <div className="mt-1">
+                              <Link
+                                href={item.itemType === 'productOption' ? `/products/option/${item.productId._id}` : `/products/${item.productId?.slug || item.productId._id}`}
+                                className="text-xs px-2 py-1 border rounded hover:bg-gray-50 transition-colors inline-block"
+                                style={{ color: "#8C6141", borderColor: "#8C6141" }}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                View {item.itemType === 'productOption' ? 'Option' : 'Product'} →
+                              </Link>
                             </div>
+                          )}
+                        </div>
                             
                             {/* Price */}
                             <div className="text-right">

@@ -1,6 +1,7 @@
 "use client"
 import { useState } from "react"
 import { useSession } from "next-auth/react"
+import { formatPriceDisplay } from "../lib/utils/priceUtils"
 
 export default function CouponSection({ cartItems, orderAmount, onCouponApply, onCouponRemove, appliedCoupon }) {
   const { data: session } = useSession()
@@ -85,14 +86,6 @@ export default function CouponSection({ cartItems, orderAmount, onCouponApply, o
                 <p className="text-sm text-green-600">
                   {appliedCoupon.coupon.description}
                 </p>
-                <div className="mt-2 text-sm text-gray-600">
-                  <p>Discount: 
-                    {appliedCoupon.coupon.discountType === 'percentage' 
-                      ? ` ${appliedCoupon.coupon.discountValue}%`
-                      : ` ₹${appliedCoupon.coupon.discountValue}`
-                    }
-                  </p>
-                </div>
               </div>
               <button
                 onClick={handleRemoveCoupon}
@@ -111,7 +104,7 @@ export default function CouponSection({ cartItems, orderAmount, onCouponApply, o
                 Coupon Discount:
               </span>
               <span className="text-lg font-bold text-green-700">
-                -₹{appliedCoupon.discount.discountAmount}
+                -{formatPriceDisplay(appliedCoupon.discount.discountAmount)}
               </span>
             </div>
             <div className="flex justify-between items-center mt-1 pt-1 border-t border-green-200">
@@ -119,7 +112,7 @@ export default function CouponSection({ cartItems, orderAmount, onCouponApply, o
                 Final Amount:
               </span>
               <span className="text-lg font-bold text-green-800">
-                ₹{appliedCoupon.discount.finalAmount}
+                {formatPriceDisplay(appliedCoupon.discount.finalAmount)}
               </span>
             </div>
           </div>

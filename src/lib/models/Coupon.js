@@ -1,4 +1,5 @@
 import mongoose from "mongoose"
+import { calculatePercentageDiscount, formatPrice } from "../utils/priceUtils.js"
 
 const CouponSchema = new mongoose.Schema(
   {
@@ -106,11 +107,11 @@ CouponSchema.methods.calculateDiscount = function(orderAmount) {
     return 0
   }
   
-  // Calculate percentage discount
-  const discount = (orderAmount * this.discountValue) / 100
+  // Use utility function for precise percentage calculation
+  const discount = calculatePercentageDiscount(orderAmount, this.discountValue)
   
   // Ensure discount doesn't exceed order amount
-  return Math.min(discount, orderAmount)
+  return Math.min(discount, formatPrice(orderAmount))
 }
 
 // Method to use coupon (decrement usage count)

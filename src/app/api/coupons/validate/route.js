@@ -3,6 +3,7 @@ import connectDB from '../../../../lib/mongodb'
 import Coupon from '../../../../lib/models/Coupon'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../auth/[...nextauth]/route'
+import { formatPrice, formatPriceDisplay, calculateFinalAmount } from '../../../../lib/utils/priceUtils.js'
 
 // POST - Validate coupon (for preview/check only - does not consume usage)
 export async function POST(request) {
@@ -54,13 +55,13 @@ export async function POST(request) {
       }, { status: 400 })
     }
 
-    // Calculate discount
-    const discountAmount = coupon.calculateDiscount(orderAmountNum)
-    const finalAmount = orderAmountNum - discountAmount
+    // Calculate discount with proper rounding using utility functions
+    const discountAmount = formatPrice(coupon.calculateDiscount(orderAmountNum))
+    const finalAmount = calculateFinalAmount(orderAmountNum, discountAmount)
 
     return NextResponse.json({
       success: true,
-      message: `Great! You will save ₹${discountAmount} with this coupon`,
+      message: `Great! You will save ${formatPriceDisplay(discountAmount)} with this coupon`,
       coupon: {
         _id: coupon._id,
         code: coupon.code,

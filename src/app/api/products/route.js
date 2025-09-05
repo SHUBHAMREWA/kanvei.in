@@ -18,10 +18,23 @@ export async function GET(request) {
     const featured = searchParams.get("featured")
 
     const filter = {}
-    if (category) filter.category = category
+    
+    // Filter by category name if provided
+    if (category) {
+      // First find the category by name to get its ID
+      const Category = (await import("../../../lib/models/Category")).default
+      const categoryDoc = await Category.findOne({ name: category }).lean()
+      if (categoryDoc) {
+        filter.categoryId = categoryDoc._id
+      } else {
+        // If category not found, return empty results
+        return Response.json({ success: true, products: [] })
+      }
+    }
+    
     if (featured) filter.featured = featured === "true"
 
-    const productsFromDB = await Product.find(filter).lean()
+    const productsFromDB = await Product.find(filter).populate('categoryId', 'name slug').lean()
 
     // For each product, fetch its images from the ProductImage collection
     const products = await Promise.all(
@@ -30,6 +43,8 @@ export async function GET(request) {
         return {
           ...product,
           images: productImages ? productImages.img : [],
+          category: product.categoryId?.name || '',
+          categorySlug: product.categoryId?.slug || ''
         }
       })
     )
@@ -74,7 +89,6 @@ export async function POST(request) {
       width: body.width,
       mrp: body.mrp,
       price: body.price,
-      category: body.category,
       categoryId: body.categoryId,
       stock: body.stock,
       featured: body.featured,

@@ -1,1043 +1,178 @@
-"use client"
-import { useState, useEffect, useRef } from "react"
-import { useParams } from "next/navigation"
-import Header from "../../../components/shared/Header"
-import Footer from "../../../components/shared/Footer"
-import Image from "next/image"
-import { useCart } from "../../../contexts/CartContext"
-import { useAuth } from "../../../contexts/AuthContext"
-import { useToast } from "../../../contexts/ToastContext"
-import ReviewForm from "../../../components/ReviewForm"
-import ReviewsList from "../../../components/ReviewsList"
-import { AiOutlineEye, AiOutlineHeart, AiFillStar } from "react-icons/ai"
-import { MdClear, MdInfoOutline } from "react-icons/md"
-import { FiZoomIn } from "react-icons/fi"
+import { notFound } from 'next/navigation'
+import ProductDetailClient from '../../../components/ProductDetailClient'
+import connectDB from '../../../lib/mongodb'
+import Product from '../../../lib/models/Product'
+import ProductImage from '../../../lib/models/ProductImage'
+import ProductAttribute from '../../../lib/models/ProductAttribute'
+import ProductOption from '../../../lib/models/ProductOption'
+import OptionImage from '../../../lib/models/OptionImage'
+import ProductView from '../../../lib/models/ProductView'
 
-export default function ProductDetailPage() {
-  const params = useParams()
-  const [product, setProduct] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [activeImageIndex, setActiveImageIndex] = useState(0)
-  const [selectedOptions, setSelectedOptions] = useState({})
-  const [quantity, setQuantity] = useState(1)
-  const [reviews, setReviews] = useState([])
-  const [rating, setRating] = useState({ average: 0, count: 0 })
-  const [isInWishlist, setIsInWishlist] = useState(false)
-  const [showMoreInfo, setShowMoreInfo] = useState(false)
-  const [showFullDescription, setShowFullDescription] = useState(false)
-  const [isHovered, setIsHovered] = useState(false)
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
-  const imageContainerRef = useRef(null)
-  const { addToCart, items } = useCart()
-  const { user, isAuthenticated } = useAuth()
-  const { showSuccess, showError, showInfo } = useToast()
+// Server-side function to fetch complete product data
+async function getProduct(slug) {
+  try {
+    await connectDB()
+    
+    // Try to find by slug first, then by ID if slug fails
+    let product = await Product.findOne({ slug }).populate('categoryId', 'name slug').lean()
+    
+    // If not found by slug, try by ID
+    if (!product && slug.match(/^[0-9a-fA-F]{24}$/)) {
+      product = await Product.findById(slug).populate('categoryId', 'name slug').lean()
+    }
+    
+    if (!product) {
+      return null
+    }
 
-
-  // Fetch product data (supports both slug and ID)
-  useEffect(() => {
-    const fetchProductData = async () => {
-      try {
-        // API already supports both slug and ID automatically
-        const res = await fetch(`/api/products/detail/${params.id}`)
-        const data = await res.json()
-        if (data.success) {
-          setProduct(data.product)
+    // Get product images
+    const productImages = await ProductImage.findOne({ productId: product._id }).lean()
+    
+    // Get product attributes
+    const productAttributes = await ProductAttribute.find({ productId: product._id }).lean()
+    
+    // Get product options
+    const productOptions = await ProductOption.find({ productId: product._id }).lean()
+    
+    // Get option images for each option
+    const optionsWithImages = await Promise.all(
+      productOptions.map(async (option) => {
+        const optionImages = await OptionImage.findOne({ optionId: option._id }).lean()
+        return {
+          ...option,
+          images: optionImages ? optionImages.img : []
         }
-      } catch (error) {
-        console.error("Error fetching product:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    const fetchReviews = async () => {
-      try {
-        // API now supports both slug and ID
-        const res = await fetch(`/api/reviews/${params.id}`)
-        const data = await res.json()
-        if (data.success) {
-          setReviews(data.reviews)
-          setRating(data.rating)
-        }
-      } catch (error) {
-        console.error("Error fetching reviews:", error)
-      }
-    }
-
-    if (params.id) {
-      fetchProductData()
-      fetchReviews()
-    }
-  }, [params.id])
-
-  // Reset active image index when options change
-  useEffect(() => {
-    setActiveImageIndex(0);
-  }, [selectedOptions]);
-
-  const handleOptionSelect = (optionType, option) => {
-    console.log('Option selected:', { optionType, option })
-    setSelectedOptions(prev => ({
-      ...prev,
-      [optionType]: prev[optionType]?.id === option.id ? null : option
-    }))
-    setQuantity(1)
-  }
-
-  const handleAddToCart = () => {
-    const availableStock = getAvailableStock()
-    const maxQuantityToAdd = Math.min(quantity, availableStock)
-    
-    if (product && maxQuantityToAdd > 0) {
-      const selectedOptionValues = Object.values(selectedOptions).filter(Boolean)
-      
-      // Check if any option is selected
-      let selectedOption = null
-      if (selectedOptionValues.length > 0) {
-        // Combine all selected options into one object
-        const combinedOption = selectedOptionValues.reduce((acc, opt) => ({
-          ...acc,
-          ...opt
-        }), {})
-        
-        selectedOption = {
-          id: combinedOption.id,
-          size: combinedOption.size,
-          color: combinedOption.color,
-          price: combinedOption.price || getCurrentPrice(),
-          stock: combinedOption.stock || getCurrentStock(),
-          images: combinedOption.images || getCurrentImages()
-        }
-      }
-      
-      // Add to cart with option if selected
-      addToCart(product, maxQuantityToAdd, selectedOption);
-      
-      const optionText = selectedOptionValues.length > 0 
-        ? ` (${selectedOptionValues.map(opt => `${opt.size || opt.color || opt.name}`).join(', ')})` 
-        : ''
-      showSuccess(`Added ${maxQuantityToAdd} ${product.name}${optionText} to cart`, 4000);
-      
-      // Reset quantity after successful add
-      setQuantity(1)
-    }
-  }
-
-  // Get current images based on selected options (limited to 5 images max)
-  const getCurrentImages = () => {
-    const selectedOptionValues = Object.values(selectedOptions).filter(Boolean)
-    
-    let images = []
-    
-    // If any option is selected and has images, use those
-    for (let option of selectedOptionValues) {
-      if (option.images && option.images.length > 0) {
-        images = option.images
-        break
-      }
-    }
-    
-    // Otherwise use product images
-    if (images.length === 0) {
-      images = product?.images || []
-    }
-    
-    // Limit to maximum 5 images
-    return images.slice(0, 5)
-  }
-
-  // Get current price based on selected options
-  const getCurrentPrice = () => {
-    const selectedOptionValues = Object.values(selectedOptions).filter(Boolean)
-    let price = product?.price || 0
-    
-    // Add option price differences
-    selectedOptionValues.forEach(option => {
-      if (option.priceModifier) {
-        price += option.priceModifier
-      } else if (option.price) {
-        price = option.price
-      }
-    })
-    
-    return price
-  }
-
-  // Get current MRP
-  const getCurrentMRP = () => {
-    const selectedOptionValues = Object.values(selectedOptions).filter(Boolean)
-    let mrp = product?.mrp || 0
-    
-    selectedOptionValues.forEach(option => {
-      if (option.mrp) {
-        mrp = option.mrp
-      }
-    })
-    
-    return mrp
-  }
-
-  // Get current stock
-  const getCurrentStock = () => {
-    const selectedOptionValues = Object.values(selectedOptions).filter(Boolean)
-    
-    if (selectedOptionValues.length > 0) {
-      // Return the minimum stock among selected options
-      return Math.min(...selectedOptionValues.map(opt => opt.stock || 0))
-    }
-    
-    return product?.stock || 0
-  }
-  
-  // Get available stock (considering items already in cart)
-  const getAvailableStock = () => {
-    const currentStock = getCurrentStock()
-    
-    // Check for specific option in cart or main product
-    let cartQuantity = 0
-    const selectedOptionValues = Object.values(selectedOptions).filter(Boolean)
-    
-    if (selectedOptionValues.length > 0) {
-      // Check if this specific option combination is in cart
-      const combinedOption = selectedOptionValues.reduce((acc, opt) => ({ ...acc, ...opt }), {})
-      const optionCartItem = items.find(item => {
-        // For product options, compare with productOption ID
-        return item.productOption?._id === combinedOption.id || item.productOption?._id === combinedOption._id
       })
-      cartQuantity = optionCartItem?.quantity || 0
-    } else {
-      // Check main product in cart
-      const mainCartItem = items.find(item => {
-        // For main products, compare product ID and ensure no productOption is set
-        return item.product?._id === product?._id && !item.productOption
-      })
-      cartQuantity = mainCartItem?.quantity || 0
-    }
+    )
     
-    return Math.max(0, currentStock - cartQuantity)
-  }
-
-
-  // Get key highlights from attributes
-  const getKeyHighlights = () => {
-    const highlightAttributes = ['RAM', 'Storage', 'Processor', 'Display', 'Camera', 'Battery', 'Warranty']
-    return product?.attributes?.filter(attr => 
-      highlightAttributes.some(highlight => 
-        attr.name?.toLowerCase().includes(highlight.toLowerCase())
+    // Get product views
+    const productViews = await ProductView.findOne({ productId: product._id }).lean()
+    
+    // Increment view count
+    if (productViews) {
+      await ProductView.findOneAndUpdate(
+        { productId: product._id },
+        { $inc: { views: 1 } }
       )
-    ) || []
-  }
-
-  // Group attributes by type/category
-  const getGroupedAttributes = () => {
-    const groups = {}
-    product?.attributes?.forEach(attr => {
-      const groupName = attr.group || 'General'
-      if (!groups[groupName]) groups[groupName] = []
-      groups[groupName].push(attr)
-    })
-    return groups
-  }
-
-  // Check if product category should have options (only shoes and cloth)
-  const shouldShowOptions = () => {
-    if (!product?.category) return false
-    const category = product.category.toLowerCase()
-    return category.includes('shoe') || category.includes('cloth') || category.includes('apparel') || category.includes('garment') || category.includes('dress') || category.includes('shirt') || category.includes('pant') || category.includes('jean') || category.includes('footwear')
-  }
-
-  // Group options by type
-  const getGroupedOptions = () => {
-    if (!shouldShowOptions()) return {}
-    
-    const groups = {}
-    product?.options?.forEach(option => {
-      const groupName = option.size ? 'Size' : option.color ? 'Color' : 'Options'
-      if (!groups[groupName]) groups[groupName] = []
-      groups[groupName].push(option)
-    })
-    return groups
-  }
-
-  const handleWishlistToggle = async () => {
-    if (!user) {
-      showInfo("Please login to add items to wishlist", 4000)
-      return
-    }
-
-    try {
-      const res = await fetch("/api/wishlist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user._id, productId: product._id }),
-      })
-
-      const data = await res.json()
-      if (data.success) {
-        setIsInWishlist(data.action === "added")
-        if (data.action === "added") {
-          showSuccess("Added to wishlist ❤️", 3000)
-        } else {
-          showInfo("Removed from wishlist", 3000)
-        }
-      } else {
-        showError(data.error || "Failed to update wishlist", 4000)
-      }
-    } catch (error) {
-      console.error("Error toggling wishlist:", error)
-      showError("Failed to update wishlist. Please try again.", 4000)
-    }
-  }
-
-  const handleReviewAdded = () => {
-    const fetchReviews = async () => {
-      try {
-        const res = await fetch(`/api/reviews/${params.id}`)
-        const data = await res.json()
-        if (data.success) {
-          setReviews(data.reviews)
-          setRating(data.rating)
-        }
-      } catch (error) {
-        console.error("Error fetching reviews:", error)
-      }
-    }
-    fetchReviews()
-  }
-
-  // Calculate current data using helper functions
-  const currentImages = getCurrentImages()
-  const currentPrice = getCurrentPrice()
-  const currentMRP = getCurrentMRP()
-  const currentStock = getCurrentStock()
-  const availableStock = getAvailableStock()
-  const keyHighlights = getKeyHighlights()
-  const groupedAttributes = getGroupedAttributes()
-  const groupedOptions = getGroupedOptions()
-  const swiperKey = JSON.stringify(selectedOptions) + product?._id;
-  
-  // Check if current selection (main product or specific option) is in cart
-  const getCartInfo = () => {
-    const selectedOptionValues = Object.values(selectedOptions).filter(Boolean)
-    
-    if (selectedOptionValues.length > 0) {
-      // Check for specific option in cart
-      const combinedOption = selectedOptionValues.reduce((acc, opt) => ({ ...acc, ...opt }), {})
-      const optionCartItem = items.find(item => {
-        // For product options, compare with productOption ID
-        return item.productOption?._id === combinedOption.id || item.productOption?._id === combinedOption._id
-      })
-      return {
-        cartItem: optionCartItem,
-        cartQuantity: optionCartItem?.quantity || 0,
-        isInCart: !!optionCartItem
-      }
     } else {
-      // Check main product in cart (excluding options)
-      const mainCartItem = items.find(item => {
-        // For main products, compare product ID and ensure no productOption is set
-        return item.product?._id === product?._id && !item.productOption
-      })
-      return {
-        cartItem: mainCartItem,
-        cartQuantity: mainCartItem?.quantity || 0,
-        isInCart: !!mainCartItem
-      }
+      await ProductView.create({ productId: product._id, views: 1 })
     }
+    
+    return {
+      ...product,
+      _id: product._id.toString(),
+      categoryId: product.categoryId ? {
+        ...product.categoryId,
+        _id: product.categoryId._id.toString()
+      } : null,
+      images: productImages ? productImages.img : [],
+      attributes: productAttributes.map(attr => ({
+        ...attr,
+        _id: attr._id.toString(),
+        productId: attr.productId.toString()
+      })) || [],
+      options: optionsWithImages.map(opt => ({
+        ...opt,
+        _id: opt._id.toString(),
+        productId: opt.productId.toString()
+      })) || [],
+      views: productViews ? productViews.views + 1 : 1,
+      category: product.categoryId?.name || '',
+      categorySlug: product.categoryId?.slug || ''
+    }
+  } catch (error) {
+    console.error('Error fetching product:', error)
+    return null
   }
+}
+
+// Generate metadata for SEO
+export async function generateMetadata({ params }) {
+  const product = await getProduct(params.id)
   
-  const cartInfo = getCartInfo()
-  const { cartItem, cartQuantity, isInCart } = cartInfo
-  const maxQuantityToAdd = Math.min(quantity, availableStock)
-  
-  // Debug logging
-  console.log('Current display data:', {
-    selectedOptions,
-    currentImages: currentImages?.length || 0,
-    currentPrice,
-    currentMRP,
-    currentStock,
-    productImages: product?.images?.length || 0
-  })
-
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <main className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2" style={{ borderColor: "#5A0117" }}></div>
-        </main>
-        <Footer />
-      </div>
-    )
-  }
-
   if (!product) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <main className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold mb-4" style={{ fontFamily: "Sugar, serif", color: "#5A0117" }}>
-              Product not found
-            </h1>
-            <p style={{ fontFamily: "Montserrat, sans-serif", color: "#8C6141" }}>
-              The product you are looking for does not exist.
-            </p>
-          </div>
-        </main>
-        <Footer />
-      </div>
-    )
-  }
-
-  // Handle mouse events for zoom effect (desktop only)
-  const handleMouseEnter = () => {
-    if (window.innerWidth >= 768) { // Only on desktop
-      setIsHovered(true)
+    return {
+      title: 'Product Not Found - Kanvei',
+      description: 'The product you are looking for is not available.',
     }
   }
 
-  const handleMouseLeave = () => {
-    setIsHovered(false)
-  }
-
-  const handleMouseMove = (e) => {
-    if (!isHovered || window.innerWidth < 768) return
+  const title = product.title || product.name
+  const description = product.description || `${product.name} - Premium quality product available at Kanvei. ${product.brand ? `Brand: ${product.brand}. ` : ''}Price: ₹${product.price}.`
+  const imageUrl = product.images && product.images[0] ? product.images[0] : '/placeholder.svg'
+  
+  return {
+    title: `${title} - Kanvei`,
+    description: description.length > 160 ? description.substring(0, 157) + '...' : description,
+    keywords: [
+      product.name,
+      product.brand,
+      product.category,
+      'Kanvei',
+      'premium products',
+      'online shopping',
+      ...(product.attributes?.map(attr => attr.name) || [])
+    ].filter(Boolean).join(', '),
     
-    if (imageContainerRef.current) {
-      const rect = imageContainerRef.current.getBoundingClientRect()
-      const x = ((e.clientX - rect.left) / rect.width) * 100
-      const y = ((e.clientY - rect.top) / rect.height) * 100
-      setMousePosition({ x, y })
-    }
-  }
-
-  // Clear selected options with animation
-  const clearOptions = () => {
-    // Add a small animation/fade effect
-    const optionButtons = document.querySelectorAll('[data-option-button]')
-    optionButtons.forEach(button => {
-      button.style.transform = 'scale(0.95)'
-      setTimeout(() => {
-        button.style.transform = 'scale(1)'
-      }, 150)
-    })
+    openGraph: {
+      title: `${title} - Kanvei`,
+      description: description.length > 200 ? description.substring(0, 197) + '...' : description,
+      images: [
+        {
+          url: imageUrl,
+          width: 800,
+          height: 800,
+          alt: product.name,
+        },
+      ],
+      type: 'website',
+      siteName: 'Kanvei',
+    },
     
-    setSelectedOptions({})
-    setActiveImageIndex(0)
-    setQuantity(1) // Reset quantity as well
+    twitter: {
+      card: 'summary_large_image',
+      title: `${title} - Kanvei`,
+      description: description.length > 200 ? description.substring(0, 197) + '...' : description,
+      images: [imageUrl],
+    },
     
-    // Show confirmation feedback
-    const confirmationMessage = "Selection cleared - showing original product"
-    console.log(confirmationMessage)
+    // Additional SEO meta tags
+    other: {
+      'product:price:amount': product.price,
+      'product:price:currency': 'INR',
+      'product:availability': product.stock > 0 ? 'in stock' : 'out of stock',
+      'product:condition': 'new',
+      'product:brand': product.brand || 'Kanvei',
+      'product:category': product.category,
+    },
   }
+}
 
-  return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
+// Generate static params for better SEO (optional - for static generation)
+export async function generateStaticParams() {
+  try {
+    await connectDB()
+    const products = await Product.find({ slug: { $exists: true, $ne: null } })
+      .select('slug')
+      .limit(100) // Limit for initial static generation
+      .lean()
+    
+    return products.map((product) => ({
+      id: product.slug,
+    }))
+  } catch (error) {
+    console.error('Error generating static params:', error)
+    return []
+  }
+}
 
-      <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 mb-12">
-            
-            {/* Left Side - Image Gallery */}
-            <div className="space-y-4">
-              {/* Main Image with Zoom Effect and Wishlist */}
-              <div className="relative">
-                <div 
-                  ref={imageContainerRef}
-                  className="aspect-square rounded-lg overflow-hidden border-2 border-gray-200 relative cursor-zoom-in"
-                  onMouseEnter={handleMouseEnter}
-                  onMouseLeave={handleMouseLeave}
-                  onMouseMove={handleMouseMove}
-                >
-                  {currentImages && currentImages.length > 0 ? (
-                    <Image
-                      key={`main-${activeImageIndex}-${JSON.stringify(selectedOptions)}`}
-                      src={currentImages[activeImageIndex] || "/placeholder.svg"}
-                      alt={`${product.name} ${activeImageIndex + 1}`}
-                      fill
-                      className={`object-cover transition-transform duration-300 ${
-                        isHovered ? 'scale-150' : 'scale-100'
-                      }`}
-                      style={{
-                        transformOrigin: isHovered ? `${mousePosition.x}% ${mousePosition.y}%` : 'center'
-                      }}
-                      priority={activeImageIndex === 0}
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="text-4xl text-gray-400 mb-2">📷</div>
-                        <p className="text-sm text-gray-500">No image available</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Wishlist Button - Top Right */}
-                  <button
-                    onClick={handleWishlistToggle}
-                    className={`absolute top-3 right-3 w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-lg ${
-                      isInWishlist 
-                        ? 'bg-red-500 text-white' 
-                        : 'bg-white text-gray-600 hover:bg-red-50 hover:text-red-500'
-                    }`}
-                  >
-                    <AiOutlineHeart className={`w-5 h-5 ${isInWishlist ? 'fill-current' : ''}`} />
-                  </button>
-                  
-                  {/* Zoom Icon - Top Left */}
-                  <div className="absolute top-3 left-3 bg-white bg-opacity-80 p-2 rounded-full">
-                    <FiZoomIn className="w-4 h-4 text-gray-600" />
-                  </div>
-                  
-                  {/* Navigation Arrows */}
-                  {currentImages && currentImages.length > 1 && (
-                    <>
-                      <button
-                        onClick={() => setActiveImageIndex((prev) => 
-                          prev === 0 ? currentImages.length - 1 : prev - 1
-                        )}
-                        className="absolute left-3 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full p-2 shadow-lg transition-all"
-                        style={{ color: "#5A0117" }}
-                      >
-                        ‹
-                      </button>
-                      <button
-                        onClick={() => setActiveImageIndex((prev) => 
-                          prev === currentImages.length - 1 ? 0 : prev + 1
-                        )}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full p-2 shadow-lg transition-all"
-                        style={{ color: "#5A0117" }}
-                      >
-                        ›
-                      </button>
-                    </>
-                  )}
-                  
-                  {/* Image Counter */}
-                  {currentImages && currentImages.length > 1 && (
-                    <div className="absolute bottom-3 right-3 bg-black bg-opacity-70 text-white text-sm px-3 py-1 rounded-full">
-                      {activeImageIndex + 1} / {currentImages.length}
-                    </div>
-                  )}
-                </div>
-                
-                {/* Views Counter */}
-                <div className="absolute bottom-3 left-3 bg-white bg-opacity-90 px-3 py-2 rounded-full flex items-center gap-2 shadow-md">
-                  <AiOutlineEye className="w-4 h-4" style={{ color: "#8C6141" }} />
-                  <span className="text-sm font-medium" style={{ color: "#5A0117" }}>
-                    {product.views ? product.views.toLocaleString() : 0} views
-                  </span>
-                </div>
-              </div>
-              
-              {/* Thumbnail Images */}
-              {currentImages && currentImages.length > 1 && (
-                <div className="grid grid-cols-5 sm:grid-cols-5 md:grid-cols-6 gap-2">
-                  {currentImages.map((image, index) => (
-                    <button
-                      key={`thumb-${index}-${JSON.stringify(selectedOptions)}`}
-                      onClick={() => setActiveImageIndex(index)}
-                      className={`aspect-square rounded-md overflow-hidden border-2 transition-all ${
-                        index === activeImageIndex 
-                          ? 'border-opacity-100 ring-2 ring-offset-1' 
-                          : 'border-opacity-30 hover:border-opacity-60'
-                      }`}
-                      style={{ 
-                        borderColor: "#5A0117",
-                        ringColor: index === activeImageIndex ? "#5A0117" : "transparent"
-                      }}
-                    >
-                      <Image
-                        src={image || "/placeholder.svg"}
-                        alt={`${product.name} thumbnail ${index + 1}`}
-                        width={80}
-                        height={80}
-                        className="object-cover w-full h-full"
-                      />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Right Side - Product Information */}
-            <div className="space-y-6">
-              {/* Product Title and Brand */}
-              <div>
-                {product.brand && (
-                  <p className="text-sm font-medium mb-2" style={{ color: "#8C6141" }}>
-                    {product.brand}
-                  </p>
-                )}
-                <h1 className="text-2xl lg:text-3xl font-bold" style={{ fontFamily: "Sugar, serif", color: "#5A0117" }}>
-                  {product.name}
-                </h1>
-                {product.title && product.title !== product.name && (
-                  <p className="text-lg text-gray-600 mt-2" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                    {product.title}
-                  </p>
-                )}
-              </div>
-
-              {/* Rating */}
-              <div className="flex items-center gap-3">
-                <div className="flex gap-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <AiFillStar
-                      key={star}
-                      className={`w-5 h-5 ${star <= Math.round(rating.average) ? 'text-yellow-400' : 'text-gray-300'}`}
-                    />
-                  ))}
-                </div>
-                <span className="text-sm font-medium" style={{ color: "#8C6141" }}>
-                  {rating.average > 0 ? rating.average.toFixed(1) : '0.0'} ({rating.count} reviews)
-                </span>
-              </div>
-
-
-              {/* Price */}
-              <div>
-                <div className="flex items-baseline gap-4 mb-2">
-                  <span className="text-3xl font-bold" style={{ color: "#5A0117" }}>
-                    ₹{currentPrice.toLocaleString()}
-                  </span>
-                  {currentMRP && currentMRP > currentPrice && (
-                    <>
-                      <span className="text-xl text-gray-500 line-through">
-                        ₹{currentMRP.toLocaleString()}
-                      </span>
-                      <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm font-medium">
-                        {Math.round(((currentMRP - currentPrice) / currentMRP) * 100)}% OFF
-                      </span>
-                    </>
-                  )}
-                </div>
-      
-              </div>
-
-              {/* Available Options */}
-              {Object.keys(groupedOptions).length > 0 && (
-                <div className="border rounded-lg p-4" style={{ backgroundColor: "#FAFAFA" }}>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold" style={{ color: "#5A0117" }}>
-                      Available Options
-                    </h3>
-        
-                  </div>
-                  
-                  <div className="space-y-4">
-                    {/* Original Product Option - Always First */}
-                    <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-5 lg:flex lg:flex-wrap gap-2">
-                      <button
-                        onClick={clearOptions}
-                        className={`p-2 sm:px-3 sm:py-2 border-2 rounded-lg text-xs transition-all transform hover:scale-105 ${
-                          Object.keys(selectedOptions).length === 0 
-                            ? 'bg-gradient-to-r from-red-50 to-red-100 border-red-600 shadow-lg ring-2 ring-red-200 ring-opacity-50' 
-                            : 'bg-white border-gray-300 hover:border-red-400 hover:bg-red-50 hover:shadow-md'
-                        }`}
-                        style={{
-                          borderColor: Object.keys(selectedOptions).length === 0 ? "#dc2626" : "#5A0117",
-                          boxShadow: Object.keys(selectedOptions).length === 0 ? '0 4px 12px rgba(220, 38, 38, 0.15)' : 'none'
-                        }}
-                      >
-                        <div className="flex flex-col items-center gap-1 sm:gap-2 sm:flex-row">
-                          {product.images && product.images[0] && (
-                            <div className="relative">
-                              <Image 
-                                src={product.images[0]}
-                                alt={`${product.name} original`}
-                                width={50}
-                                height={50}
-                                className="rounded w-10 h-10 sm:w-12 sm:h-12 object-cover flex-shrink-0"
-                              />
-                              {/* Color name overlay for mobile - Original Product - minus 55 degree rotation */}
-                              {product.attributes && product.attributes.find(attr => 
-                                attr.name.toLowerCase().includes('color') || attr.name.toLowerCase().includes('colour')
-                              ) && (
-                                <div className="absolute top-1 right-1 sm:hidden">
-                                  <div className="text-black text-xs font-bold transform -rotate-[55deg] origin-top-right">
-                                    <span className="block whitespace-nowrap">
-                                      {product.attributes.find(attr => 
-                                        attr.name.toLowerCase().includes('color') || attr.name.toLowerCase().includes('colour')
-                                      ).type}
-                                    </span>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          <div className="text-center sm:text-left min-w-0 flex-1">
-                            <div className="font-semibold text-xs leading-tight" style={{ color: "#5A0117" }}>
-                              {/* Show original product size first, then color as fallback */}
-                              {product.attributes && product.attributes.find(attr => 
-                                attr.name.toLowerCase().includes('size')
-                              ) ? 
-                                product.attributes.find(attr => attr.name.toLowerCase().includes('size')).type :
-                                (product.attributes && product.attributes.find(attr => 
-                                  attr.name.toLowerCase().includes('color') || attr.name.toLowerCase().includes('colour')
-                                ) ? 
-                                  product.attributes.find(attr => 
-                                    attr.name.toLowerCase().includes('color') || attr.name.toLowerCase().includes('colour')
-                                  ).type : 'Standard'
-                                )
-                              }
-                            </div>
-                            {/* Show original product color if available and size is also present - hide on mobile */}
-                            {product.attributes && product.attributes.find(attr => 
-                              attr.name.toLowerCase().includes('size')
-                            ) && product.attributes.find(attr => 
-                              attr.name.toLowerCase().includes('color') || attr.name.toLowerCase().includes('colour')
-                            ) && (
-                              <div className="hidden sm:block text-xs truncate" style={{ color: "#8C6141" }}>
-                                {product.attributes.find(attr => 
-                                  attr.name.toLowerCase().includes('color') || attr.name.toLowerCase().includes('colour')
-                                ).type}
-                              </div>
-                            )}
-                            {product.price && (
-                              <div className="text-xs font-medium" style={{ color: "#8C6141" }}>
-                                ₹{product.price.toLocaleString()}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </button>
-                      
-                      {/* Other Options */}
-                      {Object.entries(groupedOptions).map(([groupName, options]) => 
-                        options.map((option, index) => {
-                          const isSelected = selectedOptions[groupName]?.id === option._id
-                          return (
-                            <button
-                              key={`${groupName}-${index}`}
-                              onClick={() => handleOptionSelect(groupName, { 
-                                id: option._id, 
-                                name: option.size || option.color || 'Option',
-                                size: option.size,
-                                color: option.color,
-                                price: option.price,
-                                mrp: option.mrp,
-                                stock: option.stock,
-                                images: option.images
-                              })}
-                              className={`p-2 sm:px-3 sm:py-2 border-2 rounded-lg text-xs transition-all transform hover:scale-105 ${
-                                isSelected 
-                                  ? 'bg-gradient-to-r from-red-50 to-red-100 border-red-600 shadow-lg ring-2 ring-red-200 ring-opacity-50' 
-                                  : 'bg-white border-gray-300 hover:border-red-400 hover:bg-red-50 hover:shadow-md'
-                              }`}
-                              style={{
-                                borderColor: isSelected ? "#dc2626" : "#5A0117",
-                                boxShadow: isSelected ? '0 4px 12px rgba(220, 38, 38, 0.15)' : 'none'
-                              }}
-                            >
-                              <div className="flex flex-col items-center gap-1 sm:gap-2 sm:flex-row">
-                                {option.images && option.images[0] && (
-                                  <div className="relative">
-                                    <Image 
-                                      src={option.images[0]}
-                                      alt={option.size || option.color || 'Option'}
-                                      width={50}
-                                      height={50}
-                                      className="rounded w-10 h-10 sm:w-12 sm:h-12 object-cover flex-shrink-0"
-                                    />
-                                    {/* Color name overlay for mobile - Option - 45 degree rotation */}
-                                    {option.color && (
-                                      <div className="absolute top-0 right-0 sm:hidden overflow-hidden">
-                                        <div className="bg-gradient-to-br from-red-600 to-red-800 text-white text-xs px-3 py-1 transform rotate-45 translate-x-2 -translate-y-1 shadow-lg">
-                                          <span className="block whitespace-nowrap text-center font-medium">
-                                            {option.color}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                                <div className="text-center sm:text-left min-w-0 flex-1">
-                                  <div className="font-semibold text-xs leading-tight" style={{ color: "#5A0117" }}>
-                                    {option.size || option.color}
-                                  </div>
-                                  {/* Show color if it exists and is different from main display - hide on mobile */}
-                                  {option.color && option.size && (
-                                    <div className="hidden sm:block text-xs truncate" style={{ color: "#8C6141" }}>
-                                      {option.color}
-                                    </div>
-                                  )}
-                                  {option.price && (
-                                    <div className="text-xs font-medium" style={{ color: "#8C6141" }}>
-                                      ₹{option.price.toLocaleString()}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </button>
-                          )
-                        })
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* More Info Section */}
-              <div className="border rounded-lg overflow-hidden">
-                <button
-                  onClick={() => setShowMoreInfo(!showMoreInfo)}
-                  className="w-full px-4 py-3 bg-gray-50 text-left flex items-center justify-between hover:bg-gray-100 transition-colors"
-                >
-                  <span className="font-medium flex items-center gap-2" style={{ color: "#5A0117" }}>
-                    <MdInfoOutline className="w-5 h-5" />
-                    More Information
-                  </span>
-                  <span className="text-xl" style={{ color: "#5A0117" }}>
-                    {showMoreInfo ? '−' : '+'}
-                  </span>
-                </button>
-                
-                {showMoreInfo && (
-                  <div className="p-4 bg-white border-t">
-                    {/* Product Attributes */}
-                    {product.attributes && product.attributes.length > 0 && (
-                      <div className="mb-4">
-                        <h4 className="font-semibold mb-3" style={{ color: "#5A0117" }}>
-                          Specifications
-                        </h4>
-                        <div className="space-y-2">
-                          {product.attributes.map((attr, index) => {
-                            // Check if this attribute is size or color and update accordingly
-                            let displayValue = attr.type
-                            const attrName = attr.name.toLowerCase()
-                            
-                            // Check for size attribute
-                            if (attrName === 'size') {
-                              // First check Size group options
-                              if (selectedOptions['Size'] && selectedOptions['Size'].size) {
-                                displayValue = selectedOptions['Size'].size
-                              }
-                              // Then check Color group options if they have size
-                              else if (selectedOptions['Color'] && selectedOptions['Color'].size) {
-                                displayValue = selectedOptions['Color'].size
-                              }
-                              // Fallback to name if size field doesn't exist
-                              else if (selectedOptions['Size'] && selectedOptions['Size'].name) {
-                                displayValue = selectedOptions['Size'].name
-                              }
-                            } 
-                            // Check for color attribute
-                            else if (attrName === 'color' || attrName === 'colour') {
-                              // First check Color group options
-                              if (selectedOptions['Color'] && selectedOptions['Color'].color) {
-                                displayValue = selectedOptions['Color'].color
-                              }
-                              // Then check Size group options if they have color
-                              else if (selectedOptions['Size'] && selectedOptions['Size'].color) {
-                                displayValue = selectedOptions['Size'].color
-                              }
-                              // Fallback to name if color field doesn't exist but it's a color group
-                              else if (selectedOptions['Color'] && selectedOptions['Color'].name) {
-                                displayValue = selectedOptions['Color'].name
-                              }
-                            }
-                            
-                            // Debug logging for troubleshooting
-                            if (attrName === 'color' || attrName === 'size') {
-                              console.log(`Attribute: ${attr.name}`, {
-                                originalValue: attr.type,
-                                selectedOptions: selectedOptions,
-                                sizeOption: selectedOptions['Size'],
-                                colorOption: selectedOptions['Color'],
-                                finalDisplayValue: displayValue
-                              })
-                            }
-                            
-                            return (
-                              <div key={index} className="flex justify-between py-1 border-b border-gray-100 last:border-b-0">
-                                <span className="text-sm font-medium" style={{ color: "#8C6141" }}>
-                                  {attr.name}
-                                </span>
-                                <span className="text-sm" style={{ color: "#5A0117" }}>
-                                  {displayValue}
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Stock and Category Info */}
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="font-medium" style={{ color: "#8C6141" }}>Stock:</span>
-                        <p className={`${currentStock > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {currentStock > 0 ? `${currentStock} available` : 'Out of stock'}
-                        </p>
-                      </div>
-                      <div>
-                        <span className="font-medium" style={{ color: "#8C6141" }}>Category:</span>
-                        <p style={{ color: "#5A0117" }}>{product.category}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Description */}
-              {product.description && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-3" style={{ color: "#5A0117" }}>
-                    Description
-                  </h3>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-gray-700 leading-relaxed">
-                      {showFullDescription || product.description.length <= 200
-                        ? product.description
-                        : `${product.description.substring(0, 200)}...`
-                      }
-                    </p>
-                    {product.description.length > 200 && (
-                      <button
-                        onClick={() => setShowFullDescription(!showFullDescription)}
-                        className="mt-3 text-sm font-medium hover:underline"
-                        style={{ color: "#5A0117" }}
-                      >
-                        {showFullDescription ? 'Show Less' : 'Show More'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Show current cart info if item is in cart */}
-              {isInCart && (
-                <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
-                  <p className="text-sm font-medium text-green-700" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                    ✓ {cartQuantity} item(s) already in cart
-                    {Object.values(selectedOptions).filter(Boolean).length > 0 && (
-                      <span className="ml-2 text-xs">
-                        ({Object.values(selectedOptions).filter(Boolean).map(opt => opt.size || opt.color || opt.name).join(', ')})
-                      </span>
-                    )}
-                  </p>
-                </div>
-              )}
-              
-              {/* Quantity and Actions */}
-              <div className="space-y-4">
-                {currentStock > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium mb-2" style={{ color: "#5A0117" }}>
-                      Quantity:
-                    </label>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                        disabled={quantity <= 1}
-                        className="w-10 h-10 border-2 rounded-lg flex items-center justify-center hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                        style={{ borderColor: "#5A0117", color: "#5A0117" }}
-                      >
-                        −
-                      </button>
-                      <span className="text-lg font-semibold px-4" style={{ color: "#5A0117" }}>
-                        {quantity}
-                      </span>
-                      <button
-                        onClick={() => setQuantity(Math.min(availableStock, quantity + 1))}
-                        disabled={quantity >= availableStock}
-                        className="w-10 h-10 border-2 rounded-lg flex items-center justify-center hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                        style={{ borderColor: "#5A0117", color: "#5A0117" }}
-                      >
-                        +
-                      </button>
-                      
-                      {/* Stock limit messages */}
-                      <div className="ml-3 text-sm">
-                        {quantity >= availableStock && availableStock > 0 && (
-                          <span className="text-orange-600" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                            Max available
-                          </span>
-                        )}
-                        
-                        {availableStock === 0 && (
-                          <span className="text-red-600" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                            No more available
-                          </span>
-                        )}
-                        
-                        {availableStock > 0 && quantity < availableStock && (
-                          <span className="text-gray-500" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                            {availableStock} available
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Action Buttons */}
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleAddToCart}
-                    disabled={currentStock === 0 || availableStock === 0}
-                    className="flex-1 py-3 px-6 text-white font-semibold rounded-lg transition-opacity disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
-                    style={{ backgroundColor: "#5A0117" }}
-                  >
-                    {currentStock === 0 
-                      ? 'Out of Stock' 
-                      : availableStock === 0 
-                      ? 'No More Available'
-                      : isInCart 
-                      ? `Add ${maxQuantityToAdd} More`
-                      : `Add ${maxQuantityToAdd} to Cart`
-                    }
-                  </button>
-                  <button
-                    onClick={handleWishlistToggle}
-                    className={`px-4 py-3 border-2 rounded-lg transition-all ${
-                      isInWishlist ? 'text-red-500 border-red-500 bg-red-50' : 'hover:bg-gray-50'
-                    }`}
-                    style={{
-                      borderColor: isInWishlist ? '#ef4444' : '#8C6141',
-                      color: isInWishlist ? '#ef4444' : '#8C6141'
-                    }}
-                  >
-                    Add to Wishlist
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Reviews Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-16">
-            <div>
-              <h2 className="text-2xl font-bold mb-6" style={{ fontFamily: "Sugar, serif", color: "#5A0117" }}>
-                Product Reviews
-              </h2>
-              {reviews && reviews.length > 0 ? (
-                <ReviewsList reviews={reviews} rating={rating} />
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <p>No reviews yet. Be the first to review this product!</p>
-                </div>
-              )}
-            </div>
-            
-            <div>
-              <h2 className="text-2xl font-bold mb-6" style={{ fontFamily: "Sugar, serif", color: "#5A0117" }}>
-                Write a Review
-              </h2>
-              {/* ReviewForm now handles all authentication and purchase eligibility checks */}
-              <ReviewForm productId={product._id} onReviewAdded={handleReviewAdded} />
-            </div>
-          </div>
-        </div>
-      </main>
-
-      <Footer />
-    </div>
-  )
+// Main server component
+export default async function ProductPage({ params }) {
+  const product = await getProduct(params.id)
+  
+  if (!product) {
+    notFound()
+  }
+  
+  return <ProductDetailClient product={product} />
 }

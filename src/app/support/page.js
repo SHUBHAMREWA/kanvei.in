@@ -3,7 +3,7 @@ import { useState } from "react"
 import Header from "../../components/shared/Header"
 import Footer from "../../components/shared/Footer"
 import { useToast } from "../../contexts/ToastContext"
-import { FiMail, FiPhone, FiMessageSquare, FiClock, FiMapPin, FiHeadphones } from "react-icons/fi"
+import { FiMail, FiPhone, FiMessageSquare, FiClock, FiMapPin, FiHeadphones, FiSend, FiCheckCircle } from "react-icons/fi"
 
 export default function SupportPage() {
   const [formData, setFormData] = useState({
@@ -36,8 +36,10 @@ export default function SupportPage() {
         body: JSON.stringify(formData),
       })
 
-      if (response.ok) {
-        showSuccess("Your message has been sent successfully! We'll get back to you soon.", 5000)
+      const data = await response.json()
+      
+      if (response.ok && data.success) {
+        showSuccess(data.message || "Your message has been sent successfully! We'll get back to you soon.", 5000)
         setFormData({
           name: "",
           email: "",
@@ -46,10 +48,12 @@ export default function SupportPage() {
           category: "general"
         })
       } else {
-        showError("Failed to send message. Please try again or contact us directly.", 4000)
+        const errorMessage = data.error || "Failed to send message. Please try again or contact us directly."
+        showError(errorMessage, 4000)
       }
     } catch (error) {
-      showError("Failed to send message. Please try again or contact us directly.", 4000)
+      console.error('Support form error:', error)
+      showError("Network error. Please check your connection and try again.", 4000)
     } finally {
       setIsSubmitting(false)
     }
@@ -265,10 +269,20 @@ export default function SupportPage() {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full py-3 px-6 text-white font-semibold rounded-lg transition-opacity disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
+                    className="w-full py-3 px-6 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 hover:shadow-lg transform hover:-translate-y-0.5 flex items-center justify-center gap-2"
                     style={{ backgroundColor: "#5A0117" }}
                   >
-                    {isSubmitting ? "Sending..." : "Send Message"}
+                    {isSubmitting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Sending...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FiSend className="w-4 h-4" />
+                        <span>Send Message</span>
+                      </>
+                    )}
                   </button>
                 </form>
 

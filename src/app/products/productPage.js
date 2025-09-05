@@ -576,7 +576,24 @@ export default function ProductsPage() {
               </aside>
 
               {/* Right Content - Products */}
-              <main className="flex-1 px-4 sm:px-6 lg:px-8">
+              <main className="flex-1 px-4 sm:px-6 lg:px-8 relative">
+                {/* Mobile Filter Button - Positioned relative to products section */}
+                <div className="lg:hidden">
+                  <button
+                    onClick={() => setShowFilters(true)}
+                    className="absolute bottom-4 right-4 p-4 rounded-full shadow-lg border transition-all duration-200 hover:scale-110 hover:shadow-xl z-40"
+                    style={{ 
+                      backgroundColor: '#5A0117',
+                      color: 'white',
+                      borderColor: '#5A0117'
+                    }}
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+                    </svg>
+                  </button>
+                </div>
+                
                 {loading ? (
                   <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4">
                     {[...Array(20)].map((_, i) => (
@@ -605,18 +622,6 @@ export default function ProductsPage() {
                         )}
                       </div>
                       
-                      {/* Mobile Filter Icon */}
-                      <div className="lg:hidden">
-                        <button
-                          onClick={() => setShowFilters(true)}
-                          className="p-3 rounded-lg shadow-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
-                          style={{ color: "#5A0117" }}
-                        >
-                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
-                          </svg>
-                        </button>
-                      </div>
                     </div>
 
                     {/* Products Grid */}
