@@ -369,7 +369,7 @@ export default function ClothingCategoryPage() {
                 className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-8 text-center group hover:scale-105"
               >
                 <h3 className="text-2xl font-bold mb-3 group-hover:text-opacity-80" style={{ fontFamily: "Sugar, serif", color: "#5A0117" }}>
-                  Men's Wear
+                  Men s Wear
                 </h3>
                 <p className="text-lg" style={{ fontFamily: "Montserrat, sans-serif", color: "#8C6141" }}>
                   Stylish clothing for men
@@ -381,7 +381,7 @@ export default function ClothingCategoryPage() {
                 className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-8 text-center group hover:scale-105"
               >
                 <h3 className="text-2xl font-bold mb-3 group-hover:text-opacity-80" style={{ fontFamily: "Sugar, serif", color: "#5A0117" }}>
-                  Women's Wear
+                  Women s Wear
                 </h3>
                 <p className="text-lg" style={{ fontFamily: "Montserrat, sans-serif", color: "#8C6141" }}>
                   Elegant fashion for women
