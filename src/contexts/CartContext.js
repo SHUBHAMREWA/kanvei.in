@@ -96,7 +96,7 @@ export function CartProvider({ children }) {
         if (data.updated) {
           showSuccess(data.message || 'Item quantity updated in cart!')
         } else {
-          showSuccess('Item added to cart successfully! 🛒')
+          showSuccess('Item added to cart successfully! 🛍️')
         }
         return true
       } else {
@@ -136,6 +136,7 @@ export function CartProvider({ children }) {
 
       if (response.ok) {
         setCartData(data.cart || { items: [], totalItems: 0, totalAmount: 0 })
+        
         showSuccess('Item removed from cart')
         return true
       } else {
@@ -185,6 +186,7 @@ export function CartProvider({ children }) {
 
       if (response.ok) {
         setCartData(data.cart || { items: [], totalItems: 0, totalAmount: 0 })
+        
         if (quantity === 0) {
           showSuccess('Item removed from cart')
         } else {

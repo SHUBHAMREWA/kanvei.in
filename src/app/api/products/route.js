@@ -12,9 +12,30 @@ import { authOptions } from "../auth/[...nextauth]/route"
 
 export async function GET(request) {
   try {
-    await connectDB()
+    // Ensure database connection with retry logic
+    let connectionAttempts = 0
+    const maxAttempts = 3
+    
+    while (connectionAttempts < maxAttempts) {
+      try {
+        await connectDB()
+        break
+      } catch (dbError) {
+        connectionAttempts++
+        console.error(`Database connection attempt ${connectionAttempts} failed:`, dbError)
+        
+        if (connectionAttempts >= maxAttempts) {
+          throw new Error(`Failed to connect to database after ${maxAttempts} attempts`)
+        }
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000))
+      }
+    }
+    
     const { searchParams } = new URL(request.url)
     const category = searchParams.get("category")
+    const subcategory = searchParams.get("subcategory")
     const featured = searchParams.get("featured")
     const page = parseInt(searchParams.get("page")) || 1
     const limit = parseInt(searchParams.get("limit")) || 0 // 0 means no limit (fetch all)
@@ -22,16 +43,75 @@ export async function GET(request) {
 
     const filter = {}
     
-    // Filter by category name if provided
+    // Filter by category name if provided (supports hierarchical categories)
     if (category) {
-      // First find the category by name to get its ID
       const Category = (await import("../../../lib/models/Category")).default
-      const categoryDoc = await Category.findOne({ name: category }).lean()
+      
+      // Find the main category by name (case insensitive)
+      const categoryDoc = await Category.findOne({ 
+        name: { $regex: new RegExp(`^${category}$`, 'i') } 
+      }).lean()
+      
       if (categoryDoc) {
-        filter.categoryId = categoryDoc._id
+        // Find all child categories of this parent category
+        const childCategories = await Category.find({ 
+          parentCategory: categoryDoc._id 
+        }).lean()
+        
+        // Create array of category IDs to include (parent + all children)
+        const categoryIds = [categoryDoc._id]
+        childCategories.forEach(child => {
+          categoryIds.push(child._id)
+        })
+        
+        console.log(`🔍 Category Filter: ${category}`, {
+          mainCategoryId: categoryDoc._id,
+          childCategoryIds: childCategories.map(c => c._id),
+          totalCategoriesIncluded: categoryIds.length
+        })
+        
+        // If subcategory is specified, only include that specific subcategory
+        if (subcategory) {
+          const subcategoryDoc = childCategories.find(child => 
+            child.name.toLowerCase().includes(subcategory.toLowerCase()) ||
+            child.slug === subcategory
+          )
+          
+          if (subcategoryDoc) {
+            console.log(`🎨 Subcategory Filter: ${subcategory} (${subcategoryDoc.name})`)
+            filter.categoryId = subcategoryDoc._id
+          } else {
+            console.log(`❌ Subcategory '${subcategory}' not found under '${category}'`)
+            return Response.json({ 
+              success: true, 
+              products: [], 
+              pagination: {
+                currentPage: 1,
+                totalPages: 0,
+                totalCount: 0,
+                hasMore: false,
+                limit: 0
+              }
+            })
+          }
+        } else {
+          // Filter products that belong to parent category OR any child category
+          filter.categoryId = { $in: categoryIds }
+        }
       } else {
         // If category not found, return empty results
-        return Response.json({ success: true, products: [], totalCount: 0, hasMore: false })
+        console.log(`❌ Category '${category}' not found in database`)
+        return Response.json({ 
+          success: true, 
+          products: [], 
+          pagination: {
+            currentPage: 1,
+            totalPages: 0,
+            totalCount: 0,
+            hasMore: false,
+            limit: 0
+          }
+        })
       }
     }
     
@@ -67,17 +147,29 @@ export async function GET(request) {
 
     return Response.json({ 
       success: true, 
-      products, 
+      products: products || [], 
       pagination: {
         currentPage,
         totalPages,
-        totalCount,
-        hasMore,
+        totalCount: totalCount || 0,
+        hasMore: hasMore || false,
         limit
       }
     })
   } catch (error) {
-    return Response.json({ success: false, error: error.message }, { status: 500 })
+    console.error('Products API Error:', error)
+    return Response.json({ 
+      success: false, 
+      error: error.message || 'Failed to fetch products',
+      products: [],
+      pagination: {
+        currentPage: 1,
+        totalPages: 0,
+        totalCount: 0,
+        hasMore: false,
+        limit: 0
+      }
+    }, { status: 500 })
   }
 }
 

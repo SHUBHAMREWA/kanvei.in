@@ -1,11 +1,11 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
-import Header from "../../components/shared/Header"
-import Footer from "../../components/shared/Footer"
-import ProductCard from "../../components/ProductCard"
-import { ProductGridSkeleton } from "../../components/ProductSkeleton"
-import ProductSkeleton from "../../components/ProductSkeleton"
+import Header from "./shared/Header"
+import Footer from "./shared/Footer"
+import ProductCard from "./ProductCard"
+import { ProductGridSkeleton } from "./ProductSkeleton"
+import ProductSkeleton from "./ProductSkeleton"
 
 // Custom styles for dual range slider and mobile filter button
 const sliderStyles = `
@@ -131,193 +131,20 @@ const sliderStyles = `
   }
 `
 
-// Cache configuration
-const CACHE_KEY = 'kanvei_products_cache'
-const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes in milliseconds
-const CATEGORIES_CACHE_KEY = 'kanvei_categories_cache'
-const PAGE_ENTRY_KEY = 'kanvei_page_entry_method'
-const LAST_NAVIGATION_KEY = 'kanvei_last_navigation'
+// No caching - always fetch fresh data
 
-// Enhanced cache utility functions
-const getCachedData = (key) => {
-  try {
-    const cached = localStorage.getItem(key)
-    if (!cached) {
-      console.log(`📭 No cache found for ${key}`)
-      return null
-    }
-    
-    const { data, timestamp } = JSON.parse(cached)
-    const now = Date.now()
-    const age = now - timestamp
-    
-    // Check if cache is still valid (within 5 minutes)
-    if (age < CACHE_DURATION) {
-      const remainingTime = Math.round((CACHE_DURATION - age) / 1000)
-      console.log(`✅ Using cached data for ${key} (${remainingTime}s remaining)`)
-      return data
-    } else {
-      console.log(`⏰ Cache expired for ${key} (${Math.round(age / 1000)}s old), removing...`)
-      localStorage.removeItem(key)
-      return null
-    }
-  } catch (error) {
-    console.error(`❌ Error reading cache for ${key}:`, error)
-    localStorage.removeItem(key)
-    return null
-  }
-}
-
-const setCachedData = (key, data) => {
-  try {
-    const cacheObject = {
-      data,
-      timestamp: Date.now(),
-      version: '1.0' // For future cache invalidation if needed
-    }
-    localStorage.setItem(key, JSON.stringify(cacheObject))
-    console.log(`💾 Cached data for ${key} (${JSON.stringify(cacheObject).length} bytes)`)
-  } catch (error) {
-    console.error(`❌ Error caching data for ${key}:`, error)
-    // If quota exceeded, clear old cache and try again
-    if (error.name === 'QuotaExceededError') {
-      console.log('💿 Storage quota exceeded, clearing cache...')
-      clearProductsCache()
-      try {
-        localStorage.setItem(key, JSON.stringify(cacheObject))
-        console.log(`💾 Cached data for ${key} after cleanup`)
-      } catch (retryError) {
-        console.error(`❌ Failed to cache even after cleanup:`, retryError)
-      }
-    }
-  }
-}
-
-const clearProductsCache = () => {
-  const keys = [CACHE_KEY, CATEGORIES_CACHE_KEY]
-  keys.forEach(key => {
-    if (localStorage.getItem(key)) {
-      localStorage.removeItem(key)
-      console.log(`🗑️ Cleared cache for ${key}`)
-    }
-  })
-  console.log('🧹 All products cache cleared')
-}
-
-// Expose globally for cart operations
-if (typeof window !== 'undefined') {
-  window.clearProductsCache = clearProductsCache
-}
-
-// Enhanced manual page refresh detection
-const detectPageRefresh = () => {
-  if (typeof window === 'undefined') {
-    return false
-  }
-  
-  try {
-    const now = Date.now()
-    const currentUrl = window.location.href
-    
-    // Method 1: Check navigation type using Performance API (modern browsers)
-    let wasRefreshed = false
-    
-    // Try modern Navigation API first
-    if ('navigation' in window && window.navigation.currentEntry) {
-      const entry = window.navigation.currentEntry
-      wasRefreshed = entry.index === 0 // First entry after refresh
-    }
-    // Fallback to Performance API
-    else if (window.performance?.getEntriesByType) {
-      const navigationEntries = window.performance.getEntriesByType('navigation')
-      if (navigationEntries.length > 0) {
-        wasRefreshed = navigationEntries[0].type === 'reload'
-      }
-    }
-    // Legacy fallback
-    else if (window.performance?.navigation) {
-      wasRefreshed = window.performance.navigation.type === window.performance.navigation.TYPE_RELOAD
-    }
-    
-    // Method 2: Check session storage for navigation tracking
-    const lastNavigation = sessionStorage.getItem(LAST_NAVIGATION_KEY)
-    const pageEntryMethod = sessionStorage.getItem(PAGE_ENTRY_KEY)
-    
-    // If no previous navigation record, this is likely a fresh page load/refresh
-    if (!lastNavigation && !pageEntryMethod) {
-      wasRefreshed = true
-    }
-    
-    // Method 3: Check if page was accessed directly (no referrer from same origin)
-    if (!wasRefreshed && document.referrer) {
-      try {
-        const referrerUrl = new URL(document.referrer)
-        const currentUrlObj = new URL(currentUrl)
-        // If referrer is from different origin or different path, it's navigation
-        if (referrerUrl.origin === currentUrlObj.origin && referrerUrl.pathname !== currentUrlObj.pathname) {
-          wasRefreshed = false // This is navigation between pages
-        }
-      } catch (e) {
-        // Invalid referrer URL, treat as refresh
-        wasRefreshed = true
-      }
-    }
-    
-    if (wasRefreshed) {
-      console.log('🔄 Manual page refresh detected - clearing cache for fresh data')
-      console.log('📍 Detection methods:', {
-        navigationAPI: 'navigation' in window,
-        performanceAPI: !!window.performance?.getEntriesByType,
-        referrer: document.referrer,
-        pageEntry: pageEntryMethod
-      })
-      
-      clearProductsCache()
-      
-      // Clear session indicators
-      sessionStorage.removeItem(PAGE_ENTRY_KEY)
-      sessionStorage.removeItem(LAST_NAVIGATION_KEY)
-      
-      // Mark this as a refresh
-      sessionStorage.setItem(PAGE_ENTRY_KEY, JSON.stringify({
-        type: 'refresh',
-        timestamp: now,
-        url: currentUrl
-      }))
-      
-      return true
-    } else {
-      console.log('🧭 Page navigation detected - cache will be used if available')
-      
-      // Mark this as navigation
-      sessionStorage.setItem(PAGE_ENTRY_KEY, JSON.stringify({
-        type: 'navigation',
-        timestamp: now,
-        url: currentUrl,
-        referrer: document.referrer
-      }))
-    }
-    
-    // Update last navigation timestamp
-    sessionStorage.setItem(LAST_NAVIGATION_KEY, now.toString())
-    
-    return false
-    
-  } catch (error) {
-    console.error('❌ Error in refresh detection:', error)
-    // On error, assume refresh to be safe and fetch fresh data
-    clearProductsCache()
-    return true
-  }
-}
-
-export default function ProductsPage() {
+function CategoryPageContent({ 
+  categoryName, 
+  displayName, 
+  description, 
+  icon, 
+  subcategories = null,
+  subcategoryType = null // 'mens-wear', 'womens-wear', 'kids-wear' for clothing subcategories
+}) {
   const searchParams = useSearchParams()
   const [products, setProducts] = useState([])
-  const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [selectedCategory, setSelectedCategory] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
   const [priceRange, setPriceRange] = useState({ min: 0, max: 10000 })
   const [sortBy, setSortBy] = useState("name")
@@ -333,8 +160,6 @@ export default function ProductsPage() {
   // Filter button scroll state
   const [isNearFooter, setIsNearFooter] = useState(false)
   const [error, setError] = useState(null)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [usingCache, setUsingCache] = useState(false)
 
   // Handle URL search parameters
   useEffect(() => {
@@ -344,64 +169,19 @@ export default function ProductsPage() {
     }
   }, [searchParams])
 
-  // Fetch initial data with caching
+  
+  // Fetch initial data - always fresh
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
         setLoading(true)
-        setUsingCache(false)
         setError(null)
         
-        // Detect manual page refresh and clear cache if needed
-        const wasRefreshed = detectPageRefresh()
-        
-        // Check for cached products first (only if not refreshed)
-        let cachedProducts = null
-        let cachedCategories = null
-        
-        if (!wasRefreshed) {
-          cachedProducts = getCachedData(CACHE_KEY)
-          cachedCategories = getCachedData(CATEGORIES_CACHE_KEY)
-        }
-        
-        if (cachedProducts && cachedCategories && !wasRefreshed) {
-          // Use cached data immediately
-          console.log('🚀 Loading from cache - no API calls needed!')
-          console.log('📊 Cache data:', {
-            products: cachedProducts.products?.length || 0,
-            categories: cachedCategories?.length || 0,
-            totalProducts: cachedProducts.pagination?.totalCount || 0
-          })
-          
-          setProducts(cachedProducts.products || [])
-          setTotalProducts(cachedProducts.pagination?.totalCount || 0)
-          setHasMore(cachedProducts.pagination?.hasMore || false)
-          setCurrentPage(cachedProducts.pagination?.currentPage || 1)
-          setCategories(cachedCategories || [])
-          setUsingCache(true)
-          setError(null)
-          setLoading(false)
-          return // Exit early, no API calls needed!
-        }
-        
-        // Log reason for fresh data fetch with detailed info
-        const reasonForFresh = []
-        if (wasRefreshed) {
-          reasonForFresh.push('page was manually refreshed')
-        }
-        if (!cachedProducts) {
-          reasonForFresh.push('no products cache found')
-        }
-        if (!cachedCategories) {
-          reasonForFresh.push('no categories cache found')
-        }
-        
-        console.log(`🆕 Fetching fresh data - reason: ${reasonForFresh.join(', ')}`)
+        console.log(`🆕 Fetching fresh ${categoryName} data from API`)
         console.log('📍 Fetch conditions:', {
-          wasRefreshed,
-          hasProductsCache: !!cachedProducts,
-          hasCategoriesCache: !!cachedCategories,
-          timestamp: new Date().toISOString()
+          categoryName,
+          timestamp: new Date().toISOString(),
+          subcategoryType: subcategoryType || 'none'
         })
         
         // Fetch first page of products with pagination - with retry logic
@@ -409,9 +189,23 @@ export default function ProductsPage() {
         const maxRetries = 3
         let productsData = null
         
+        // Build API URL based on category and subcategory
+        // Use lowercase category name for API call as that's how they're stored in DB
+        const categoryNameForAPI = categoryName.toLowerCase()
+        let apiUrl = `/api/products?category=${categoryNameForAPI}&page=1&limit=${itemsPerPage}`
+        if (subcategoryType) {
+          // For subcategories like mens-wear, womens-wear, kids-wear
+          apiUrl += `&subcategory=${subcategoryType}`
+          console.log(`🎨 Fetching subcategory: ${subcategoryType} under ${categoryName}`)
+        } else {
+          console.log(`📚 Fetching all products for category: ${categoryName} (including child categories)`)
+        }
+        
+        console.log(`🔗 API URL: ${apiUrl}`)
+        
         while (retryCount < maxRetries && !productsData?.success) {
           try {
-            const productsRes = await fetch(`/api/products?page=1&limit=${itemsPerPage}`, {
+            const productsRes = await fetch(apiUrl, {
               headers: {
                 'Cache-Control': 'no-cache',
               }
@@ -424,7 +218,7 @@ export default function ProductsPage() {
             productsData = await productsRes.json()
             
             if (productsData.success) {
-              console.log('✅ Products loaded successfully:', productsData.products?.length || 0, 'products')
+              console.log(`✅ ${categoryName} products loaded successfully:`, productsData.products?.length || 0, 'products')
               
               // Set state
               setProducts(productsData.products || [])
@@ -432,18 +226,12 @@ export default function ProductsPage() {
               setHasMore(productsData.pagination?.hasMore || false)
               setCurrentPage(1)
               
-              // Cache the successful response
-              setCachedData(CACHE_KEY, {
-                products: productsData.products || [],
-                pagination: productsData.pagination
-              })
-              
               break
             } else {
-              console.warn(`⚠️ Products fetch failed (attempt ${retryCount + 1}):`, productsData.error)
+              console.warn(`⚠️ ${categoryName} products fetch failed (attempt ${retryCount + 1}):`, productsData.error)
             }
           } catch (fetchError) {
-            console.error(`❌ Products fetch error (attempt ${retryCount + 1}):`, fetchError)
+            console.error(`❌ ${categoryName} products fetch error (attempt ${retryCount + 1}):`, fetchError)
             retryCount++
             
             if (retryCount < maxRetries) {
@@ -455,49 +243,24 @@ export default function ProductsPage() {
         
         // If all retries failed, show error state
         if (!productsData?.success) {
-          console.error('❌ Failed to load products after all retries')
+          console.error(`❌ Failed to load ${categoryName} products after all retries`)
           setProducts([]) // Ensure we don't show stale data
-          setError('Failed to load products. Please refresh the page to try again.')
+          setError(`Failed to load ${categoryName} products. Please refresh the page to try again.`)
         } else {
           setError(null) // Clear any previous errors
         }
-
-        // Fetch categories (with similar retry logic)
-        if (!cachedCategories) {
-          try {
-            const categoriesRes = await fetch("/api/categories", {
-              headers: {
-                'Cache-Control': 'no-cache',
-              }
-            })
-            const categoriesData = await categoriesRes.json()
-            
-            if (categoriesData.success) {
-              setCategories(categoriesData.categories || [])
-              // Cache categories too
-              setCachedData(CATEGORIES_CACHE_KEY, categoriesData.categories || [])
-            } else {
-              console.warn('⚠️ Categories fetch failed:', categoriesData.error)
-              setCategories([])
-            }
-          } catch (categoriesError) {
-            console.error('❌ Categories fetch error:', categoriesError)
-            setCategories([])
-          }
-        }
         
       } catch (error) {
-        console.error("❌ Error in fetchInitialData:", error)
+        console.error(`❌ Error in fetch${categoryName}Data:`, error)
         setProducts([])
-        setCategories([])
-        setError('Something went wrong while loading products. Please refresh the page.')
+        setError(`Something went wrong while loading ${categoryName} products. Please refresh the page.`)
       } finally {
         setLoading(false)
       }
     }
 
     fetchInitialData()
-  }, [])
+  }, [categoryName, subcategoryType])
   
   // Intersection Observer for footer detection
   useEffect(() => {
@@ -528,31 +291,13 @@ export default function ProductsPage() {
 
   // Function to reset all filters
   const resetAllFilters = () => {
-    setSelectedCategory("")
     setSearchTerm("")
     setPriceRange({ min: 0, max: 10000 })
     setSortBy("name")
     setInStock(false)
   }
-  
-  // Function to force refresh cache
-  const refreshCache = async () => {
-    console.log('🔄 Force refreshing cache...')
-    clearProductsCache()
-    setLoading(true)
-    setError(null)
-    setUsingCache(false)
-    
-    // Re-run the fetch logic
-    const fetchData = async () => {
-      // This will now fetch fresh data since cache is cleared
-      window.location.reload()
-    }
-    
-    fetchData()
-  }
 
-  // Function to load more products (updates cache too)
+  // Function to load more products
   const loadMoreProducts = async () => {
     if (!hasMore || loadingMore) return
     
@@ -560,9 +305,21 @@ export default function ProductsPage() {
       setLoadingMore(true)
       const nextPage = currentPage + 1
       
-      console.log(`📦 Loading more products - page ${nextPage}`)
+      console.log(`📦 Loading more ${categoryName} products - page ${nextPage}`)
       
-      const productsRes = await fetch(`/api/products?page=${nextPage}&limit=${itemsPerPage}`, {
+      // Use lowercase category name for API call
+      const categoryNameForAPI = categoryName.toLowerCase()
+      let apiUrl = `/api/products?category=${categoryNameForAPI}&page=${nextPage}&limit=${itemsPerPage}`
+      if (subcategoryType) {
+        apiUrl += `&subcategory=${subcategoryType}`
+        console.log(`🎨 Loading more for subcategory: ${subcategoryType}`)
+      } else {
+        console.log(`📚 Loading more for category: ${categoryName} (all products)`)
+      }
+      
+      console.log(`🔗 Load More API URL: ${apiUrl}`)
+      
+      const productsRes = await fetch(apiUrl, {
         headers: {
           'Cache-Control': 'no-cache',
         }
@@ -575,36 +332,23 @@ export default function ProductsPage() {
         setCurrentPage(nextPage)
         setHasMore(productsData.pagination?.hasMore || false)
         
-        // Update cache with new combined data
-        const cacheData = {
-          products: newProducts,
-          pagination: {
-            ...productsData.pagination,
-            currentPage: nextPage,
-            totalCount: productsData.pagination?.totalCount || totalProducts
-          }
-        }
-        
-        setCachedData(CACHE_KEY, cacheData)
-        
-        console.log(`💾 Updated cache with ${newProducts.length} total products (page ${nextPage})`)
+        console.log(`📦 Loaded more ${categoryName} products - page ${nextPage}`)
         console.log(`📊 Pagination:`, {
           currentPage: nextPage,
-          totalProducts: cacheData.pagination.totalCount,
-          hasMore: cacheData.pagination.hasMore
+          totalProducts: productsData.pagination?.totalCount || totalProducts,
+          hasMore: productsData.pagination?.hasMore || false
         })
       } else {
-        console.error('⚠️ Failed to load more products:', productsData.error)
+        console.error(`⚠️ Failed to load more ${categoryName} products:`, productsData.error)
       }
     } catch (error) {
-      console.error("Error loading more products:", error)
+      console.error(`Error loading more ${categoryName} products:`, error)
     } finally {
       setLoadingMore(false)
     }
   }
 
   const filteredProducts = products.filter((product) => {
-    const matchesCategory = !selectedCategory || product.category === selectedCategory
     const matchesSearch =
       !searchTerm ||
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -616,7 +360,7 @@ export default function ProductsPage() {
 
     const matchesStock = !inStock || product.stock > 0
 
-    return matchesCategory && matchesSearch && matchesPrice && matchesStock
+    return matchesSearch && matchesPrice && matchesStock
   })
 
   const sortedProducts = [...filteredProducts].sort((a, b) => {
@@ -686,7 +430,7 @@ export default function ProductsPage() {
                     </label>
                     <input
                       type="text"
-                      placeholder="Search products..."
+                      placeholder={`Search ${displayName.toLowerCase()}...`}
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50"
@@ -695,26 +439,6 @@ export default function ProductsPage() {
                         focusRingColor: "#5A0117",
                       }}
                     />
-                  </div>
-
-                  {/* Category Filter */}
-                  <div>
-                    <label className="block text-sm font-semibold mb-3" style={{ fontFamily: "Montserrat, sans-serif", color: "#5A0117" }}>
-                      Category
-                    </label>
-                    <select
-                      value={selectedCategory}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                      className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50"
-                      style={{ fontFamily: "Montserrat, sans-serif", focusRingColor: "#5A0117" }}
-                    >
-                      <option value="">All Categories</option>
-                      {categories.map((category) => (
-                        <option key={category._id} value={category.name}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
                   </div>
 
                   {/* Price Range */}
@@ -860,17 +584,30 @@ export default function ProductsPage() {
 
       <main className="flex-1">
         {/* Page Header */}
-      {/* <section className="py-16 px-4 sm:px-6 lg:px-8 text-white" style={{ backgroundColor: "#5A0117" }}>
+        <section className="py-16 px-4 sm:px-6 lg:px-8 text-white" style={{ backgroundColor: "#5A0117" }}>
           <div className="max-w-7xl mx-auto text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-4" style={{ fontFamily: "Sugar, serif" }}>
-              Shop All Products
+              {icon} {displayName}
             </h1>
             <p className="text-xl opacity-90" style={{ fontFamily: "Montserrat, sans-serif", color: "#DBCCB7" }}>
-              Discover our complete collection with advanced filtering options
+              {description}
             </p>
           </div>
-        </section> */}
+        </section>
 
+        {/* Subcategories Section (if provided) */}
+        {subcategories && (
+          <section className="py-8 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto">
+              <h2 className="text-3xl font-bold mb-8 text-center" style={{ fontFamily: "Sugar, serif", color: "#5A0117" }}>
+                Shop by Category
+              </h2>
+              <div className={`grid grid-cols-1 ${subcategories.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-3'} gap-6 mb-12`}>
+                {subcategories}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Main Content with Sidebar */}
         <section className="py-8 relative min-h-screen">
@@ -901,7 +638,7 @@ export default function ProductsPage() {
                       </label>
                       <input
                         type="text"
-                        placeholder="Search products..."
+                        placeholder={`Search ${displayName.toLowerCase()}...`}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50"
@@ -910,26 +647,6 @@ export default function ProductsPage() {
                           focusRingColor: "#5A0117",
                         }}
                       />
-                    </div>
-
-                    {/* Category Filter */}
-                    <div>
-                      <label className="block text-sm font-semibold mb-3" style={{ fontFamily: "Montserrat, sans-serif", color: "#5A0117" }}>
-                        Category
-                      </label>
-                      <select
-                        value={selectedCategory}
-                        onChange={(e) => setSelectedCategory(e.target.value)}
-                        className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50"
-                        style={{ fontFamily: "Montserrat, sans-serif", focusRingColor: "#5A0117" }}
-                      >
-                        <option value="">All Categories</option>
-                        {categories.map((category) => (
-                          <option key={category._id} value={category.name}>
-                            {category.name}
-                          </option>
-                        ))}
-                      </select>
                     </div>
 
                     {/* Price Range */}
@@ -1087,13 +804,12 @@ export default function ProductsPage() {
                       </svg>
                       
                       {/* Floating badge for filters count */}
-                      {(selectedCategory || searchTerm || priceRange.min !== 0 || priceRange.max !== 10000 || inStock) && (
+                      {(searchTerm || priceRange.min !== 0 || priceRange.max !== 10000 || inStock) && (
                         <div 
                           className="absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold animate-pulse"
                           style={{ backgroundColor: '#8C6141', color: 'white' }}
                         >
                           {[
-                            selectedCategory && '1',
                             searchTerm && '1', 
                             (priceRange.min !== 0 || priceRange.max !== 10000) && '1',
                             inStock && '1'
@@ -1120,23 +836,24 @@ export default function ProductsPage() {
                     {/* Results Header */}
                     <div className="mb-8 flex justify-between items-start gap-4">
                       <div className="flex-1">
-                        <h2 className="text-2xl lg:text-3xl font-bold mb-2" style={{ fontFamily: "Sugar, serif", color: "#5A0117" }}>
-                          🛍️ Products Collection
-                        </h2>
+                        <div className="flex items-center gap-3 mb-2">
+                          <h2 className="text-2xl lg:text-3xl font-bold" style={{ fontFamily: "Sugar, serif", color: "#5A0117" }}>
+                            {icon} {displayName} Collection
+                          </h2>
+                        </div>
                         
-                        {/* Show total products count with cache indicator */}
+                        {/* Show total products count */}
                         <div className="flex items-center gap-3 mb-2">
                           <p className="text-sm lg:text-lg" style={{ fontFamily: "Montserrat, sans-serif", color: "#8C6141" }}>
-                            {(selectedCategory || searchTerm || priceRange.min !== 0 || priceRange.max !== 10000 || inStock) ? (
+                            {(searchTerm || priceRange.min !== 0 || priceRange.max !== 10000 || inStock) ? (
                               `Showing ${sortedProducts.length} of ${products.length} products (${totalProducts} total available)`
                             ) : (
                               `Showing ${products.length} of ${totalProducts} products`
                             )}
                           </p>
-                          
                         </div>
                         
-                        {(selectedCategory || searchTerm || priceRange.min !== 0 || priceRange.max !== 10000 || inStock) && (
+                        {(searchTerm || priceRange.min !== 0 || priceRange.max !== 10000 || inStock) && (
                           <div className="flex flex-wrap gap-2">
                             <span className="text-xs bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800 px-3 py-1.5 rounded-full font-medium shadow-sm" style={{ fontFamily: "Montserrat, sans-serif" }}>
                               ✨ Filters applied
@@ -1154,7 +871,7 @@ export default function ProductsPage() {
                     </div>
                     
                     {/* Load More Button - Only show when no filters applied and there are more products to load */}
-                    {!selectedCategory && !searchTerm && priceRange.min === 0 && priceRange.max === 10000 && !inStock && (
+                    {!searchTerm && priceRange.min === 0 && priceRange.max === 10000 && !inStock && (
                       <div className="mt-12 text-center">
                         {loadingMore ? (
                           <>
@@ -1204,7 +921,7 @@ export default function ProductsPage() {
                               </span>
                             </div>
                             <p className="mt-2 text-sm opacity-70" style={{ fontFamily: "Montserrat, sans-serif", color: "#8C6141" }}>
-                              You&apos;ve seen all {totalProducts} products in our collection
+                              You&apos;ve seen all {totalProducts} products in our {displayName.toLowerCase()} collection
                             </p>
                           </div>
                         )}
@@ -1224,21 +941,12 @@ export default function ProductsPage() {
                       </p>
                       <button
                         onClick={() => {
-                          setIsRefreshing(true)
                           window.location.reload()
                         }}
-                        disabled={isRefreshing}
-                        className="px-6 py-3 text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+                        className="px-6 py-3 text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
                         style={{ backgroundColor: "#5A0117", fontFamily: "Montserrat, sans-serif" }}
                       >
-                        {isRefreshing ? (
-                          <span className="flex items-center gap-2">
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            Refreshing...
-                          </span>
-                        ) : (
-                          '🔄 Refresh Page'
-                        )}
+                        🔄 Refresh Page
                       </button>
                     </div>
                   </div>
@@ -1246,30 +954,21 @@ export default function ProductsPage() {
                   /* No Products State - Only show if we have no products and not loading */
                   <div className="text-center py-16">
                     <div className="max-w-md mx-auto">
-                      <div className="text-6xl mb-4">🛍️</div>
+                      <div className="text-6xl mb-4">{icon}</div>
                       <h3 className="text-3xl font-bold mb-4" style={{ fontFamily: "Sugar, serif", color: "#5A0117" }}>
-                        No products available
+                        No {displayName.toLowerCase()} products available
                       </h3>
                       <p className="text-lg mb-6" style={{ fontFamily: "Montserrat, sans-serif", color: "#8C6141" }}>
-                        It looks like there are no products in our catalog at the moment. Please check back later!
+                        It looks like there are no {displayName.toLowerCase()} products in our catalog at the moment. Please check back later!
                       </p>
                       <button
                         onClick={() => {
-                          setIsRefreshing(true)
                           window.location.reload()
                         }}
-                        disabled={isRefreshing}
-                        className="px-6 py-3 text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+                        className="px-6 py-3 text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
                         style={{ backgroundColor: "#5A0117", fontFamily: "Montserrat, sans-serif" }}
                       >
-                        {isRefreshing ? (
-                          <span className="flex items-center gap-2">
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            Refreshing...
-                          </span>
-                        ) : (
-                          '🔄 Refresh Page'
-                        )}
+                        🔄 Refresh Page
                       </button>
                     </div>
                   </div>
@@ -1302,5 +1001,33 @@ export default function ProductsPage() {
 
       <Footer />
     </div>
+  )
+}
+
+// Loading component for Suspense fallback
+function CategoryPageLoading() {
+  return (
+    <div className="min-h-screen flex flex-col">
+      <div className="animate-pulse">
+        <div className="h-64 bg-gradient-to-r from-gray-200 to-gray-300"></div>
+        <div className="p-8">
+          <div className="h-8 bg-gray-200 rounded mb-4 w-1/3"></div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {[...Array(10)].map((_, i) => (
+              <div key={i} className="h-64 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Main CategoryPage component with Suspense boundary
+export default function CategoryPage(props) {
+  return (
+    <Suspense fallback={<CategoryPageLoading />}>
+      <CategoryPageContent {...props} />
+    </Suspense>
   )
 }

@@ -9,7 +9,7 @@ import { MdOutlineShoppingCart } from "react-icons/md";
 
 export default function ProductCard({ product }) {
   const { addToCart, isLoggedIn } = useCart()
-  const { toggleWishlist, isInWishlist } = useWishlist()
+  const { toggleWishlist, isInWishlist, isLoggedIn: wishlistLoggedIn } = useWishlist()
   const router = useRouter()
   const [isAdding, setIsAdding] = useState(false)
   
@@ -18,7 +18,7 @@ export default function ProductCard({ product }) {
     e.stopPropagation() // Stop event bubbling
     
     if (!isLoggedIn) {
-      router.push('/login')
+      router.push('/login?redirect=/products')
       return
     }
     
@@ -26,7 +26,11 @@ export default function ProductCard({ product }) {
     
     setIsAdding(true)
     try {
-      await addToCart(product, 1) // Always add 1 item
+      const success = await addToCart(product, 1) // Always add 1 item
+      if (success) {
+        // Redirect to checkout after successful cart addition
+        router.push('/checkout')
+      }
     } catch (error) {
       console.error('Error adding to cart:', error)
     } finally {
@@ -39,7 +43,7 @@ export default function ProductCard({ product }) {
     e.stopPropagation() // Stop event bubbling
     
     if (!isLoggedIn) {
-      router.push('/login')
+      router.push('/login?redirect=/products')
       return
     }
     
@@ -54,6 +58,13 @@ export default function ProductCard({ product }) {
   const handleWishlistToggle = async (e) => {
     e.preventDefault() // Prevent Link navigation
     e.stopPropagation() // Stop event bubbling
+    
+    // Check if user is logged in before toggling wishlist
+    if (!wishlistLoggedIn) {
+      router.push('/login?redirect=/products')
+      return
+    }
+    
     await toggleWishlist(product)
   }
    
@@ -89,6 +100,7 @@ export default function ProductCard({ product }) {
             <button
               onClick={handleWishlistToggle}
               className="absolute top-2 right-2 p-1.5 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white hover:scale-105 transition-all duration-200 group/wishlist shadow-md"
+              title={!wishlistLoggedIn ? 'Click to login and add to wishlist' : isInWishlist(product._id) ? 'Remove from wishlist' : 'Add to wishlist'}
             >
               {isInWishlist(product._id) ? (
                 <svg
@@ -190,6 +202,7 @@ export default function ProductCard({ product }) {
                   background: product.stock <= 0 ? undefined : '#5A0117',
                   fontFamily: "Montserrat, sans-serif"
                 }}
+                title={product.stock <= 0 ? 'Out of stock' : !isLoggedIn ? 'Click to login and buy now' : 'Buy now'}
               >
                 {product.stock <= 0 ? 'Out of Stock' : 'Buy Now'}
               </button>
