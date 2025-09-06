@@ -60,7 +60,22 @@ export async function GET(request) {
       })
     )
 
-    return Response.json({ success: true, products })
+    // Calculate pagination metadata
+    const hasMore = limit > 0 ? (skip + limit) < totalCount : false
+    const currentPage = page
+    const totalPages = limit > 0 ? Math.ceil(totalCount / limit) : 1
+
+    return Response.json({ 
+      success: true, 
+      products, 
+      pagination: {
+        currentPage,
+        totalPages,
+        totalCount,
+        hasMore,
+        limit
+      }
+    })
   } catch (error) {
     return Response.json({ success: false, error: error.message }, { status: 500 })
   }
