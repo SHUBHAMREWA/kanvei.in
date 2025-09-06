@@ -303,8 +303,9 @@ export default function Header() {
                     </Link>
                   ) : (
                     <button
-                      onClick={() => showNotification('Please login to access cart', 'error')}
-                      className="hover:opacity-80 transition-opacity relative opacity-50 cursor-not-allowed"
+                      onClick={() => router.push(`/login?redirect=${encodeURIComponent('/cart')}`)}
+                      className="hover:opacity-80 transition-opacity relative"
+                      title="Click to login and access cart"
                     >
                       <ShoppingCartIcon sx={{ fontSize: 24 }} />
                     </button>

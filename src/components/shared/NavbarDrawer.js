@@ -2,9 +2,11 @@
 import { useEffect } from "react"
 import Link from "next/link"
 import { useAuth } from "../../contexts/AuthContext"
+import { useRouter } from "next/navigation"
 
 export default function NavbarDrawer({ isOpen, onClose }) {
   const { isAuthenticated, user, logout } = useAuth()
+  const router = useRouter()
 
   const handleLogout = () => {
     logout()
@@ -220,6 +222,14 @@ export default function NavbarDrawer({ isOpen, onClose }) {
                     My Orders
                   </Link>
                   <Link
+                    href="/cart"
+                    className="block py-2 hover:opacity-80 transition-opacity"
+                    style={{ fontFamily: "Montserrat, sans-serif" }}
+                    onClick={onClose}
+                  >
+                    My Cart
+                  </Link>
+                  <Link
                     href="/wishlist"
                     className="block py-2 hover:opacity-80 transition-opacity"
                     style={{ fontFamily: "Montserrat, sans-serif" }}
@@ -238,6 +248,16 @@ export default function NavbarDrawer({ isOpen, onClose }) {
               </div>
             ) : (
               <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    onClose()
+                    router.push(`/login?redirect=${encodeURIComponent('/cart')}`)
+                  }}
+                  className="block w-full text-center py-3 px-4 rounded-lg border border-white border-opacity-30 hover:bg-white hover:bg-opacity-10 transition-colors"
+                  style={{ fontFamily: "Montserrat, sans-serif" }}
+                >
+                  🛒 Cart (Login Required)
+                </button>
                 <Link
                   href="/login"
                   className="block w-full text-center py-3 px-4 rounded-lg border border-white border-opacity-30 hover:bg-white hover:bg-opacity-10 transition-colors"

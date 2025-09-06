@@ -4,18 +4,22 @@ import { useParams } from "next/navigation"
 import Header from "./shared/Header"
 import Footer from "./shared/Footer"
 import Image from "next/image"
-import { useCart } from "../contexts/CartContext"
-import { useAuth } from "../contexts/AuthContext"
-import { useToast } from "../contexts/ToastContext"
-import ReviewForm from "./ReviewForm"
-import ReviewsList from "./ReviewsList"
+import { useCart } from '../contexts/CartContext'
+import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../contexts/ToastContext'
+import { Swiper, SwiperSlide } from 'swiper/modules'
+import { Navigation, Pagination } from 'swiper/modules'
+import { useRouter } from 'next/navigation'
 import { AiOutlineEye, AiOutlineHeart, AiFillStar } from "react-icons/ai"
 import { MdClear, MdInfoOutline } from "react-icons/md"
 import { FiZoomIn } from "react-icons/fi"
 import { BsLightning } from "react-icons/bs"
 import { IoMdShareAlt } from "react-icons/io"
+import ReviewsList from "./ReviewsList"
+import ReviewForm from "./ReviewForm"
 
 export default function ProductDetailClient({ product: initialProduct }) {
+  const router = useRouter()
   const params = useParams()
   const [product, setProduct] = useState(initialProduct)
   const [loading, setLoading] = useState(false)
@@ -93,7 +97,8 @@ export default function ProductDetailClient({ product: initialProduct }) {
   const handleAddToCart = async () => {
     // Check if user is authenticated first
     if (!isAuthenticated || !user) {
-      showInfo("Please login to add items to cart", 4000)
+      const redirectUrl = `/login?redirect=${encodeURIComponent(window.location.pathname)}`
+      router.push(redirectUrl)
       return
     }
     
@@ -134,6 +139,11 @@ export default function ProductDetailClient({ product: initialProduct }) {
         
         // Reset quantity after successful add
         setQuantity(1)
+        
+        // Redirect to checkout page after successful add to cart
+        setTimeout(() => {
+          router.push('/checkout')
+        }, 1500)
       }
     }
   }
@@ -281,7 +291,8 @@ export default function ProductDetailClient({ product: initialProduct }) {
 
   const handleWishlistToggle = async () => {
     if (!user) {
-      showInfo("Please login to add items to wishlist", 4000)
+      const redirectUrl = `/login?redirect=${encodeURIComponent(window.location.pathname)}`
+      router.push(redirectUrl)
       return
     }
 
@@ -329,7 +340,8 @@ export default function ProductDetailClient({ product: initialProduct }) {
   const handleBuyNow = async () => {
     // Check if user is authenticated first
     if (!isAuthenticated || !user) {
-      showInfo("Please login to proceed with purchase", 4000)
+      const redirectUrl = `/login?redirect=${encodeURIComponent(window.location.pathname)}`
+      router.push(redirectUrl)
       return
     }
     
