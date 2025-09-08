@@ -754,7 +754,7 @@ export default function ProductDetailClient({ product: initialProduct }) {
                     onClick={handleBuyNow}
                     disabled={currentStock === 0 || availableStock === 0}
                     className="sm:hidden flex items-center justify-center gap-2 py-2 px-4 text-white font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
-                    style={{ backgroundColor: "#FF6B35" }}
+                    style={{ backgroundColor: "#5A0117" }}
                     title="Buy Now"
                   >
                     <BsLightning className="w-4 h-4" />
@@ -817,7 +817,7 @@ export default function ProductDetailClient({ product: initialProduct }) {
                   onClick={handleBuyNow}
                   disabled={currentStock === 0 || availableStock === 0}
                   className="hidden sm:flex items-center justify-center gap-2 py-3 px-6 text-white font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 mt-2 sm:mt-0"
-                  style={{ backgroundColor: "#FF6B35" }}
+                  style={{ backgroundColor: "#5A0117" }}
                 >
                   <BsLightning className="w-4 h-4" />
                   {currentStock === 0 
@@ -1151,7 +1151,23 @@ export default function ProductDetailClient({ product: initialProduct }) {
                   </div>
                 )}
                 
-                {/* Primary Action Button - Add to Cart */}
+                {/* Primary Action Button - Buy Now (Mobile First) */}
+                <button
+                  onClick={handleBuyNow}
+                  disabled={currentStock === 0 || availableStock === 0}
+                  className="w-full flex items-center justify-center gap-2 py-4 px-6 text-white font-bold text-lg rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 shadow-lg hover:shadow-xl"
+                  style={{ backgroundColor: "#5A0117" }}
+                >
+                  <BsLightning className="w-5 h-5" />
+                  {currentStock === 0 
+                    ? 'Out of Stock' 
+                    : availableStock === 0 
+                    ? 'No More Available'
+                    : 'Buy Now'
+                  }
+                </button>
+                
+                {/* Secondary Actions - Add to Cart */}
                 <button
                   onClick={handleAddToCart}
                   disabled={currentStock === 0 || availableStock === 0}
@@ -1165,22 +1181,6 @@ export default function ProductDetailClient({ product: initialProduct }) {
                     : isInCart 
                     ? `Add ${maxQuantityToAdd} More to Cart`
                     : `Add ${maxQuantityToAdd} to Cart`
-                  }
-                </button>
-                
-                {/* Secondary Actions - Buy Now (Full Width) */}
-                <button
-                  onClick={handleBuyNow}
-                  disabled={currentStock === 0 || availableStock === 0}
-                  className="w-full flex items-center justify-center gap-2 py-4 px-6 text-white font-bold text-lg rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 shadow-lg hover:shadow-xl"
-                  style={{ backgroundColor: "#FF6B35" }}
-                >
-                  <BsLightning className="w-5 h-5" />
-                  {currentStock === 0 
-                    ? 'Out of Stock' 
-                    : availableStock === 0 
-                    ? 'No More Available'
-                    : 'Buy Now'
                   }
                 </button>
                 
@@ -1298,7 +1298,25 @@ export default function ProductDetailClient({ product: initialProduct }) {
                 
                 {/* Action Buttons - Desktop Only */}
                 <div className="hidden sm:block space-y-4">
-                  {/* Primary Action - Add to Cart - Wider */}
+          
+                  
+                  {/* Buy Now Button - Desktop (Full Width) */}
+                  <button
+                    onClick={handleBuyNow}
+                    disabled={currentStock === 0 || availableStock === 0}
+                    className="w-full flex items-center justify-center gap-2 py-4 px-8 text-white font-bold text-lg rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 shadow-lg hover:shadow-xl"
+                    style={{ backgroundColor: "#5A0117" }}
+                  >
+                    <BsLightning className="w-5 h-5" />
+                    {currentStock === 0 
+                      ? 'Out of Stock' 
+                      : availableStock === 0 
+                      ? 'No More Available'
+                      : 'Buy Now'
+                    }
+                  </button>  
+
+                          {/* Primary Action - Add to Cart - Wider */}
                   <button
                     onClick={handleAddToCart}
                     disabled={currentStock === 0 || availableStock === 0}
@@ -1312,22 +1330,6 @@ export default function ProductDetailClient({ product: initialProduct }) {
                       : isInCart 
                       ? `Add ${maxQuantityToAdd} More to Cart`
                       : `Add ${maxQuantityToAdd} to Cart`
-                    }
-                  </button>
-                  
-                  {/* Buy Now Button - Desktop (Full Width) */}
-                  <button
-                    onClick={handleBuyNow}
-                    disabled={currentStock === 0 || availableStock === 0}
-                    className="w-full flex items-center justify-center gap-2 py-4 px-8 text-white font-bold text-lg rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 shadow-lg hover:shadow-xl"
-                    style={{ backgroundColor: "#FF6B35" }}
-                  >
-                    <BsLightning className="w-5 h-5" />
-                    {currentStock === 0 
-                      ? 'Out of Stock' 
-                      : availableStock === 0 
-                      ? 'No More Available'
-                      : 'Buy Now'
                     }
                   </button>
                   

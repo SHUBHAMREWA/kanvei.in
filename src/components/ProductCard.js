@@ -13,6 +13,7 @@ export default function ProductCard({ product }) {
   const router = useRouter()
   const [isAdding, setIsAdding] = useState(false)
   
+  
   const handleAddToCart = async (e) => {
     e.preventDefault() // Prevent Link navigation
     e.stopPropagation() // Stop event bubbling
@@ -89,17 +90,10 @@ export default function ProductCard({ product }) {
               </div>
             )}
             
-            {/* Discount Badge */}
-            {product.originalPrice && product.originalPrice > product.price && (
-              <div className="absolute top-2 right-2 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-semibold px-1.5 py-0.5 rounded-full shadow-md">
-                {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
-              </div>
-            )}
-            
             {/* Wishlist Button */}
             <button
               onClick={handleWishlistToggle}
-              className="absolute top-2 right-2 p-1.5 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white hover:scale-105 transition-all duration-200 group/wishlist shadow-md"
+              className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white hover:scale-105 transition-all duration-200 group/wishlist shadow-md z-10"
               title={!wishlistLoggedIn ? 'Click to login and add to wishlist' : isInWishlist(product._id) ? 'Remove from wishlist' : 'Add to wishlist'}
             >
               {isInWishlist(product._id) ? (
@@ -138,9 +132,9 @@ export default function ProductCard({ product }) {
                 <span className="text-sm font-bold" style={{ fontFamily: "Montserrat, sans-serif", color: "#5A0117" }}>
                   ₹{product.price}
                 </span>
-                {product.originalPrice && product.originalPrice > product.price && (
+                {((product.mrp && product.mrp > product.price) || (product.originalPrice && product.originalPrice > product.price)) && (
                   <span className="text-xs text-gray-500 line-through" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                    ₹{product.originalPrice}
+                    ₹{product.mrp || product.originalPrice}
                   </span>
                 )}
               </div>
