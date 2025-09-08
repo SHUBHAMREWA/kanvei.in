@@ -116,7 +116,7 @@ export default function HomeProductShow() {
               Products Coming Soon
             </h3>
             <p className="text-lg mb-8" style={{ color: "#8C6141", fontFamily: "Montserrat, sans-serif" }}>
-              We're working hard to bring you amazing products. Check back soon!
+              We are working hard to bring you amazing products. Check back soon!
             </p>
             <Link
               href="/products"
