@@ -7,6 +7,166 @@ import ProductCard from "./ProductCard"
 import { ProductGridSkeleton } from "./ProductSkeleton"
 import ProductSkeleton from "./ProductSkeleton"
 
+// Cache configuration for category pages
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+const PAGE_ENTRY_KEY = 'kanvei_category_page_entry'
+const LAST_NAVIGATION_KEY = 'kanvei_category_last_navigation'
+
+// Enhanced cache utility functions
+const getCachedData = (key) => {
+  try {
+    const cached = localStorage.getItem(key)
+    if (!cached) {
+      console.log(`📭 No cache found for ${key}`)
+      return null
+    }
+    
+    const { data, timestamp } = JSON.parse(cached)
+    const now = Date.now()
+    const age = now - timestamp
+    
+    if (age < CACHE_DURATION) {
+      const remainingTime = Math.round((CACHE_DURATION - age) / 1000)
+      console.log(`✅ Using cached data for ${key} (${remainingTime}s remaining)`)
+      return data
+    } else {
+      console.log(`⏰ Cache expired for ${key} (${Math.round(age / 1000)}s old), removing...`)
+      localStorage.removeItem(key)
+      return null
+    }
+  } catch (error) {
+    console.error(`❌ Error reading cache for ${key}:`, error)
+    localStorage.removeItem(key)
+    return null
+  }
+}
+
+const setCachedData = (key, data) => {
+  try {
+    const cacheObject = {
+      data,
+      timestamp: Date.now(),
+      version: '1.0'
+    }
+    localStorage.setItem(key, JSON.stringify(cacheObject))
+    console.log(`💾 Cached data for ${key} (${JSON.stringify(cacheObject).length} bytes)`)
+  } catch (error) {
+    console.error(`❌ Error caching data for ${key}:`, error)
+    if (error.name === 'QuotaExceededError') {
+      console.log('💿 Storage quota exceeded, clearing cache...')
+      clearCategoryCache(key.split('_')[2]) // Extract category name from key
+    }
+  }
+}
+
+const clearCategoryCache = (categoryName) => {
+  const cacheKey = `kanvei_category_${categoryName}_cache`
+  localStorage.removeItem(cacheKey)
+  console.log(`🗑️ Cleared cache for ${categoryName} category`)
+}
+
+// Global cache clearing function
+const clearAllCategoryCache = () => {
+  const keys = Object.keys(localStorage).filter(key => key.startsWith('kanvei_category_'))
+  keys.forEach(key => {
+    localStorage.removeItem(key)
+    console.log(`🗑️ Cleared cache: ${key}`)
+  })
+  console.log('🧩 All category cache cleared')
+}
+
+// Expose globally for debugging
+if (typeof window !== 'undefined') {
+  window.clearAllCategoryCache = clearAllCategoryCache
+  window.clearCategoryCache = clearCategoryCache
+}
+
+// Enhanced manual page refresh detection
+const detectPageRefresh = (categoryName) => {
+  if (typeof window === 'undefined') return false
+  
+  try {
+    const now = Date.now()
+    const currentUrl = window.location.href
+    let wasRefreshed = false
+    
+    // Check navigation type using multiple methods
+    if ('navigation' in window && window.navigation.currentEntry) {
+      wasRefreshed = window.navigation.currentEntry.index === 0
+    } else if (window.performance?.getEntriesByType) {
+      const navigationEntries = window.performance.getEntriesByType('navigation')
+      if (navigationEntries.length > 0) {
+        wasRefreshed = navigationEntries[0].type === 'reload'
+      }
+    } else if (window.performance?.navigation) {
+      wasRefreshed = window.performance.navigation.type === window.performance.navigation.TYPE_RELOAD
+    }
+    
+    // Check session storage for navigation tracking
+    const lastNavigation = sessionStorage.getItem(LAST_NAVIGATION_KEY)
+    const pageEntryMethod = sessionStorage.getItem(PAGE_ENTRY_KEY)
+    
+    if (!lastNavigation && !pageEntryMethod) {
+      wasRefreshed = true
+    }
+    
+    // Check referrer for same-origin navigation
+    if (!wasRefreshed && document.referrer) {
+      try {
+        const referrerUrl = new URL(document.referrer)
+        const currentUrlObj = new URL(currentUrl)
+        if (referrerUrl.origin === currentUrlObj.origin && referrerUrl.pathname !== currentUrlObj.pathname) {
+          wasRefreshed = false
+        }
+      } catch (e) {
+        wasRefreshed = true
+      }
+    }
+    
+    if (wasRefreshed) {
+      console.log(`🔄 Manual page refresh detected for ${categoryName} - clearing cache`)
+      console.log('📍 Detection methods:', {
+        navigationAPI: 'navigation' in window,
+        performanceAPI: !!window.performance?.getEntriesByType,
+        referrer: document.referrer,
+        pageEntry: pageEntryMethod
+      })
+      
+      clearCategoryCache(categoryName)
+      
+      sessionStorage.removeItem(PAGE_ENTRY_KEY)
+      sessionStorage.removeItem(LAST_NAVIGATION_KEY)
+      
+      sessionStorage.setItem(PAGE_ENTRY_KEY, JSON.stringify({
+        type: 'refresh',
+        timestamp: now,
+        url: currentUrl,
+        category: categoryName
+      }))
+      
+      return true
+    } else {
+      console.log(`🧭 ${categoryName} page navigation detected - cache will be used if available`)
+      
+      sessionStorage.setItem(PAGE_ENTRY_KEY, JSON.stringify({
+        type: 'navigation',
+        timestamp: now,
+        url: currentUrl,
+        category: categoryName,
+        referrer: document.referrer
+      }))
+    }
+    
+    sessionStorage.setItem(LAST_NAVIGATION_KEY, now.toString())
+    return false
+    
+  } catch (error) {
+    console.error(`❌ Error in ${categoryName} refresh detection:`, error)
+    clearCategoryCache(categoryName)
+    return true
+  }
+}
+
 // Custom styles for dual range slider and mobile filter button
 const sliderStyles = `
   /* Mobile Filter Button Positioning */
@@ -131,8 +291,6 @@ const sliderStyles = `
   }
 `
 
-// No caching - always fetch fresh data
-
 function CategoryPageContent({ 
   categoryName, 
   displayName, 
@@ -160,6 +318,13 @@ function CategoryPageContent({
   // Filter button scroll state
   const [isNearFooter, setIsNearFooter] = useState(false)
   const [error, setError] = useState(null)
+  const [usingCache, setUsingCache] = useState(false)
+  const [isFiltering, setIsFiltering] = useState(false)
+  
+  // Generate unique cache key for this category/subcategory combo
+  const cacheKey = subcategoryType 
+    ? `kanvei_category_${categoryName.toLowerCase()}_${subcategoryType}_cache`
+    : `kanvei_category_${categoryName.toLowerCase()}_cache`
 
   // Handle URL search parameters
   useEffect(() => {
@@ -170,18 +335,58 @@ function CategoryPageContent({
   }, [searchParams])
 
   
-  // Fetch initial data - always fresh
+  // Fetch initial data with caching
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
         setLoading(true)
+        setUsingCache(false)
         setError(null)
         
-        console.log(`🆕 Fetching fresh ${categoryName} data from API`)
+        // Detect manual page refresh and clear cache if needed
+        const wasRefreshed = detectPageRefresh(categoryName)
+        
+        // Check for cached data first (only if not refreshed)
+        let cachedData = null
+        if (!wasRefreshed) {
+          cachedData = getCachedData(cacheKey)
+        }
+        
+        if (cachedData && !wasRefreshed) {
+          // Use cached data immediately
+          console.log(`🚀 Loading ${categoryName} from cache - no API calls needed!`)
+          console.log('📊 Cache data:', {
+            products: cachedData.products?.length || 0,
+            totalProducts: cachedData.pagination?.totalCount || 0,
+            subcategory: subcategoryType || 'all'
+          })
+          
+          setProducts(cachedData.products || [])
+          setTotalProducts(cachedData.pagination?.totalCount || 0)
+          setHasMore(cachedData.pagination?.hasMore || false)
+          setCurrentPage(cachedData.pagination?.currentPage || 1)
+          setUsingCache(true) // Only show when loading from initial cache on page load
+          setError(null)
+          setLoading(false)
+          return // Exit early, no API calls needed!
+        }
+        
+        // Log reason for fresh data fetch
+        const reasonForFresh = []
+        if (wasRefreshed) {
+          reasonForFresh.push('page was manually refreshed')
+        }
+        if (!cachedData) {
+          reasonForFresh.push('no cache found')
+        }
+        
+        console.log(`🆕 Fetching fresh ${categoryName} data - reason: ${reasonForFresh.join(', ')}`)
         console.log('📍 Fetch conditions:', {
           categoryName,
           timestamp: new Date().toISOString(),
-          subcategoryType: subcategoryType || 'none'
+          subcategoryType: subcategoryType || 'none',
+          wasRefreshed,
+          hasCachedData: !!cachedData
         })
         
         // Fetch first page of products with pagination - with retry logic
@@ -226,6 +431,12 @@ function CategoryPageContent({
               setHasMore(productsData.pagination?.hasMore || false)
               setCurrentPage(1)
               
+              // Cache the successful response
+              setCachedData(cacheKey, {
+                products: productsData.products || [],
+                pagination: productsData.pagination
+              })
+              
               break
             } else {
               console.warn(`⚠️ ${categoryName} products fetch failed (attempt ${retryCount + 1}):`, productsData.error)
@@ -262,6 +473,20 @@ function CategoryPageContent({
     fetchInitialData()
   }, [categoryName, subcategoryType])
   
+  // Watch for filter changes and trigger API calls
+  useEffect(() => {
+    // Skip initial render and only trigger when filters actually change
+    if (loading) return
+    
+    const isAnyFilterActive = hasActiveFilters()
+    
+    if (isAnyFilterActive) {
+      console.log(`🔍 ${categoryName} filter changed, fetching filtered products...`)
+      setCurrentPage(1) // Reset to first page
+      fetchCategoryProducts(true, 1, false)
+    }
+  }, [searchTerm, priceRange, sortBy, inStock])
+  
   // Intersection Observer for footer detection
   useEffect(() => {
     const footer = document.querySelector('footer')
@@ -289,94 +514,164 @@ function CategoryPageContent({
     }
   }, [])
 
-  // Function to reset all filters
-  const resetAllFilters = () => {
+  // Check if any filters are currently applied
+  const hasActiveFilters = () => {
+    return (
+      searchTerm !== "" ||
+      priceRange.min !== 0 ||
+      priceRange.max !== 10000 ||
+      sortBy !== "name" ||
+      inStock === true
+    )
+  }
+  
+  // Function to reset all filters and restore cache
+  const resetAllFilters = async () => {
+    console.log(`🔄 Clearing all ${categoryName} filters...`)
     setSearchTerm("")
     setPriceRange({ min: 0, max: 10000 })
     setSortBy("name")
     setInStock(false)
-  }
-
-  // Function to load more products
-  const loadMoreProducts = async () => {
-    if (!hasMore || loadingMore) return
+    setCurrentPage(1)
+    setIsFiltering(false)
     
+    // Try to restore from cache first
+    const cachedData = getCachedData(cacheKey)
+    if (cachedData && cachedData.products) {
+      console.log(`📦 Restoring ${categoryName} products from cache after filter clear`)
+      setProducts(cachedData.products)
+      setTotalProducts(cachedData.pagination?.totalCount || 0)
+      setHasMore(cachedData.pagination?.hasMore || false)
+      setCurrentPage(cachedData.pagination?.currentPage || 1)
+      // Don't show cached indicator when manually restoring from cache after filter clear
+      setUsingCache(false)
+    } else {
+      // If no cache, fetch fresh data
+      console.log(`🆕 No cache available, fetching fresh ${categoryName} data after filter clear`)
+      await fetchCategoryProducts(false)
+    }
+    // Ensure cached indicator is hidden after filter clear
+    setUsingCache(false)
+  }
+  
+  // New function to fetch category products with or without filters
+  const fetchCategoryProducts = async (withFilters = false, page = 1, loadMore = false) => {
     try {
-      setLoadingMore(true)
-      const nextPage = currentPage + 1
+      if (!loadMore) {
+        setLoading(true)
+      } else {
+        setLoadingMore(true)
+      }
       
-      console.log(`📦 Loading more ${categoryName} products - page ${nextPage}`)
-      
-      // Use lowercase category name for API call
+      // Build API URL with category and filters
       const categoryNameForAPI = categoryName.toLowerCase()
-      let apiUrl = `/api/products?category=${categoryNameForAPI}&page=${nextPage}&limit=${itemsPerPage}`
+      let apiUrl = `/api/products?category=${categoryNameForAPI}&page=${page}&limit=${itemsPerPage}`
+      
       if (subcategoryType) {
         apiUrl += `&subcategory=${subcategoryType}`
-        console.log(`🎨 Loading more for subcategory: ${subcategoryType}`)
-      } else {
-        console.log(`📚 Loading more for category: ${categoryName} (all products)`)
       }
       
-      console.log(`🔗 Load More API URL: ${apiUrl}`)
+      if (withFilters || hasActiveFilters()) {
+        console.log(`🔍 Fetching ${categoryName} products with filters...`)
+        setIsFiltering(true)
+        setUsingCache(false)
+        
+        // Add filter parameters
+        if (searchTerm) {
+          apiUrl += `&search=${encodeURIComponent(searchTerm)}`
+        }
+        if (priceRange.min > 0) {
+          apiUrl += `&priceMin=${priceRange.min}`
+        }
+        if (priceRange.max < 10000) {
+          apiUrl += `&priceMax=${priceRange.max}`
+        }
+        if (inStock) {
+          apiUrl += `&inStock=true`
+        }
+        if (sortBy && sortBy !== 'name') {
+          apiUrl += `&sortBy=${sortBy}`
+        }
+        
+        console.log(`📡 ${categoryName} Filter API URL:`, apiUrl)
+      } else {
+        console.log(`📦 Fetching ${categoryName} products without filters (can use cache)`)
+        setIsFiltering(false)
+      }
       
-      const productsRes = await fetch(apiUrl, {
+      const response = await fetch(apiUrl, {
         headers: {
-          'Cache-Control': 'no-cache',
+          'Cache-Control': withFilters || hasActiveFilters() ? 'no-cache' : 'default',
         }
       })
-      const productsData = await productsRes.json()
       
-      if (productsData.success) {
-        const newProducts = [...products, ...productsData.products]
-        setProducts(newProducts)
-        setCurrentPage(nextPage)
-        setHasMore(productsData.pagination?.hasMore || false)
+      const data = await response.json()
+      
+      if (data.success) {
+        if (loadMore) {
+          // Append to existing products
+          const newProducts = [...products, ...data.products]
+          setProducts(newProducts)
+        } else {
+          // Replace products
+          setProducts(data.products)
+        }
         
-        console.log(`📦 Loaded more ${categoryName} products - page ${nextPage}`)
-        console.log(`📊 Pagination:`, {
-          currentPage: nextPage,
-          totalProducts: productsData.pagination?.totalCount || totalProducts,
-          hasMore: productsData.pagination?.hasMore || false
-        })
+        setTotalProducts(data.pagination?.totalCount || 0)
+        setHasMore(data.pagination?.hasMore || false)
+        setCurrentPage(page)
+        setError(null)
+        
+        // Only cache if no filters applied
+        if (!withFilters && !hasActiveFilters() && !loadMore) {
+          console.log(`💾 Caching unfiltered ${categoryName} products`)
+          setCachedData(cacheKey, {
+            products: data.products,
+            pagination: data.pagination
+          })
+        }
+        // Never show cached indicator when making fresh API calls
+        setUsingCache(false)
+        
+        console.log(`✅ ${categoryName} products loaded: ${data.products.length} (page ${page})`)
+        console.log('📊 Pagination:', data.pagination)
       } else {
-        console.error(`⚠️ Failed to load more ${categoryName} products:`, productsData.error)
+        console.error(`❌ Failed to fetch ${categoryName} products:`, data.error)
+        setError(data.error || `Failed to fetch ${categoryName} products`)
       }
     } catch (error) {
-      console.error(`Error loading more ${categoryName} products:`, error)
+      console.error(`❌ Error fetching ${categoryName} products:`, error)
+      setError(`Failed to fetch ${categoryName} products. Please try again.`)
     } finally {
+      setLoading(false)
       setLoadingMore(false)
     }
   }
+  
+  // Function to force refresh cache
+  const refreshCache = async () => {
+    console.log(`🔄 Force refreshing ${categoryName} cache...`)
+    clearCategoryCache(categoryName.toLowerCase())
+    setLoading(true)
+    setError(null)
+    setUsingCache(false)
+    
+    // Re-run the fetch logic
+    window.location.reload()
+  }
 
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch =
-      !searchTerm ||
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.description.toLowerCase().includes(searchTerm.toLowerCase())
+  // Function to load more products with filtering support
+  const loadMoreProducts = async () => {
+    if (!hasMore || loadingMore) return
+    
+    const nextPage = currentPage + 1
+    console.log(`📦 Loading more ${categoryName} products - page ${nextPage} (filtering: ${isFiltering})`)
+    
+    await fetchCategoryProducts(isFiltering, nextPage, true)
+  }
 
-    const matchesPrice =
-      (priceRange.min === 0 || product.price >= priceRange.min) &&
-      (priceRange.max === 10000 || product.price <= priceRange.max)
-
-    const matchesStock = !inStock || product.stock > 0
-
-    return matchesSearch && matchesPrice && matchesStock
-  })
-
-  const sortedProducts = [...filteredProducts].sort((a, b) => {
-    switch (sortBy) {
-      case "price-low":
-        return a.price - b.price
-      case "price-high":
-        return b.price - a.price
-      case "name":
-        return a.name.localeCompare(b.name)
-      case "newest":
-        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
-      default:
-        return 0
-    }
-  })
+  // Products are now pre-filtered and sorted by the API
+  const displayProducts = products
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -831,7 +1126,7 @@ function CategoryPageContent({
                     {/* Products Grid Skeleton */}
                     <ProductGridSkeleton itemsPerRow={5} rows={2} />
                   </>
-                ) : sortedProducts.length > 0 ? (
+                ) : displayProducts.length > 0 ? (
                   <>
                     {/* Results Header */}
                     <div className="mb-8 flex justify-between items-start gap-4">
@@ -842,18 +1137,25 @@ function CategoryPageContent({
                           </h2>
                         </div>
                         
-                        {/* Show total products count */}
+                        {/* Show total products count with filtering status */}
                         <div className="flex items-center gap-3 mb-2">
                           <p className="text-sm lg:text-lg" style={{ fontFamily: "Montserrat, sans-serif", color: "#8C6141" }}>
-                            {(searchTerm || priceRange.min !== 0 || priceRange.max !== 10000 || inStock) ? (
-                              `Showing ${sortedProducts.length} of ${products.length} products (${totalProducts} total available)`
+                            {isFiltering ? (
+                              `Showing ${displayProducts.length} filtered results of ${totalProducts} total products`
                             ) : (
-                              `Showing ${products.length} of ${totalProducts} products`
+                              `Showing ${displayProducts.length} of ${totalProducts} products`
                             )}
                           </p>
+                          
+                          
+                          {isFiltering && (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                              🔍 Filtered
+                            </span>
+                          )}
                         </div>
                         
-                        {(searchTerm || priceRange.min !== 0 || priceRange.max !== 10000 || inStock) && (
+                        {hasActiveFilters() && (
                           <div className="flex flex-wrap gap-2">
                             <span className="text-xs bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800 px-3 py-1.5 rounded-full font-medium shadow-sm" style={{ fontFamily: "Montserrat, sans-serif" }}>
                               ✨ Filters applied
@@ -865,13 +1167,13 @@ function CategoryPageContent({
 
                     {/* Products Grid */}
                     <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5 gap-4 sm:gap-6">
-                      {sortedProducts.map((product) => (
+                      {displayProducts.map((product) => (
                         <ProductCard key={product._id} product={product} />
                       ))}
                     </div>
                     
-                    {/* Load More Button - Only show when no filters applied and there are more products to load */}
-                    {!searchTerm && priceRange.min === 0 && priceRange.max === 10000 && !inStock && (
+                    {/* Load More Button - Show when there are more products to load */}
+                    {(
                       <div className="mt-12 text-center">
                         {loadingMore ? (
                           <>

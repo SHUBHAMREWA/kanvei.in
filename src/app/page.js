@@ -3,6 +3,7 @@ import { useState, useEffect } from "react"
 import Header from "../components/shared/Header"
 import Footer from "../components/shared/Footer"
 import HeroCarousel from "../components/HeroCarousel"
+import HomeProductShow from "../components/HomeProductShow"
 import Link from "next/link"
 import { FaTshirt, FaGem, FaPen, FaGift, FaMobile, FaPalette, FaTh } from "react-icons/fa"
 
@@ -227,115 +228,11 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {/* Second Row - Premium Products & All Products */}
-          <div className="w-full">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              {/* Premium Products - Left Half */}
-              <Link
-                href="/products?premium=true"
-                className="group relative overflow-hidden rounded-xl transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:scale-[1.02]"
-                style={{ 
-                  backgroundColor: "#8C6141",
-                  minHeight: "250px"
-                }}
-              >
-                <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.1) 100%)" }}></div>
-                
-                {/* Background Elements */}
-                <div className="absolute inset-0 opacity-15">
-                  <div className="absolute top-6 right-6 text-6xl">👑</div>
-                  <div className="absolute bottom-6 left-6 text-5xl">💎</div>
-                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-8xl opacity-30">⭐</div>
-                </div>
-                
-                <div className="relative h-full flex flex-col items-center justify-center p-8 text-center text-white">
-                  <div className="mb-4">
-                    <span className="text-6xl">💎</span>
-                  </div>
-                  <h2 className="text-3xl md:text-4xl font-bold mb-4" style={{ fontFamily: "Sugar, serif" }}>
-                    Premium Products
-                  </h2>
-                  <p className="text-lg md:text-xl mb-6 opacity-90" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                    Luxury Collection for Discerning Taste
-                  </p>
-                  <div className="inline-flex items-center px-8 py-3 rounded-full border-2 hover:bg-white hover:bg-opacity-10 transition-all duration-300"
-                    style={{ 
-                      borderColor: "#DBCCB7",
-                      backgroundColor: "rgba(219, 204, 183, 0.2)"
-                    }}
-                  >
-                    <span className="text-lg font-bold" style={{ fontFamily: "Sugar, serif" }}>Explore</span>
-                  </div>
-                </div>
-              </Link>
-
-              {/* All Products - Right Half */}
-              <Link
-                href="/products"
-                className="group relative overflow-hidden rounded-xl transition-all duration-300 hover:shadow-lg transform hover:scale-[1.02]"
-                style={{ 
-                  backgroundColor: "#DBCCB7",
-                  minHeight: "250px"
-                }}
-              >
-                <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, rgba(90, 1, 23, 0.05) 0%, rgba(90, 1, 23, 0.1) 100%)" }}></div>
-                
-                {/* Background Pattern */}
-                <div className="absolute inset-0 opacity-20">
-                  <div className="absolute top-8 right-8 text-5xl transform rotate-12">📚</div>
-                  <div className="absolute bottom-8 left-8 text-4xl transform -rotate-12">🛍️</div>
-                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-6xl opacity-50">🎁</div>
-                </div>
-                
-                <div className="relative h-full flex flex-col items-center justify-center p-8 text-center" style={{ color: "#5A0117" }}>
-                  <div 
-                    className="w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg"
-                    style={{ backgroundColor: "#5A0117" }}
-                  >
-                    <svg 
-                      className="w-12 h-12 text-white" 
-                      fill="none" 
-                      stroke="currentColor" 
-                      viewBox="0 0 24 24"
-                    >
-                      <path 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round" 
-                        strokeWidth={2} 
-                        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" 
-                      />
-                    </svg>
-                  </div>
-                  <h2 
-                    className="text-3xl md:text-4xl font-bold mb-4" 
-                    style={{ fontFamily: "Sugar, serif" }}
-                  >
-                    All Products
-                  </h2>
-                  <p 
-                    className="text-lg md:text-xl mb-6 opacity-80" 
-                    style={{ fontFamily: "Montserrat, sans-serif" }}
-                  >
-                    Browse our complete collection
-                  </p>
-                  <div className="inline-flex items-center px-8 py-3 rounded-full border-3 group-hover:shadow-md transition-all duration-300"
-                    style={{ 
-                      borderColor: "#5A0117",
-                      backgroundColor: "rgba(90, 1, 23, 0.1)"
-                    }}
-                  >
-                    <span className="text-lg font-bold mr-2" style={{ fontFamily: "Sugar, serif" }}>View All</span>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              </Link>
-            </div>
-          </div>
         </section>
 
-      
+        {/* Products Section */}
+        <HomeProductShow />
+
         {/* About Section */}
         <section className="py-8 sm:py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">

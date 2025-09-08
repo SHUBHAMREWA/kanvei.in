@@ -37,11 +37,32 @@ export async function GET(request) {
     const category = searchParams.get("category")
     const subcategory = searchParams.get("subcategory")
     const featured = searchParams.get("featured")
+    const search = searchParams.get("search")
+    const priceMin = searchParams.get("priceMin")
+    const priceMax = searchParams.get("priceMax")
+    const inStock = searchParams.get("inStock")
+    const sortBy = searchParams.get("sortBy") || "name"
     const page = parseInt(searchParams.get("page")) || 1
-    const limit = parseInt(searchParams.get("limit")) || 0 // 0 means no limit (fetch all)
+    const limit = parseInt(searchParams.get("limit")) || 10 // Default to 10 for filtering, 0 for no filters
     const skip = (page - 1) * limit
 
     const filter = {}
+    
+    // Check if any filters are applied
+    const hasFilters = search || priceMin || priceMax || inStock === 'true'
+    
+    console.log('🔍 API Filter Parameters:', {
+      category,
+      subcategory,
+      search,
+      priceMin,
+      priceMax,
+      inStock,
+      sortBy,
+      page,
+      limit,
+      hasFilters
+    })
     
     // Filter by category name if provided (supports hierarchical categories)
     if (category) {
@@ -116,12 +137,66 @@ export async function GET(request) {
     }
     
     if (featured) filter.featured = featured === "true"
+    
+    // Apply search filter
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { brand: { $regex: search, $options: 'i' } }
+      ]
+      console.log(`🔍 Search Filter: "${search}"`)
+    }
+    
+    // Apply price range filters
+    if (priceMin || priceMax) {
+      filter.price = {}
+      if (priceMin) {
+        filter.price.$gte = parseInt(priceMin)
+        console.log(`💰 Min Price Filter: ≥₹${priceMin}`)
+      }
+      if (priceMax && priceMax !== '10000') {
+        filter.price.$lte = parseInt(priceMax)
+        console.log(`💰 Max Price Filter: ≤₹${priceMax}`)
+      }
+    }
+    
+    // Apply stock filter
+    if (inStock === 'true') {
+      filter.stock = { $gt: 0 }
+      console.log('📦 Stock Filter: In stock only')
+    }
+    
+    console.log('🎯 Final MongoDB Filter:', JSON.stringify(filter, null, 2))
 
     // Get total count for pagination
     const totalCount = await Product.countDocuments(filter)
+    
+    // Build sort options
+    let sortOptions = {}
+    switch (sortBy) {
+      case 'price-low':
+        sortOptions = { price: 1 }
+        break
+      case 'price-high':
+        sortOptions = { price: -1 }
+        break
+      case 'name':
+        sortOptions = { name: 1 }
+        break
+      case 'newest':
+        sortOptions = { createdAt: -1 }
+        break
+      default:
+        sortOptions = { name: 1 }
+    }
+    console.log(`🔄 Sort Options: ${JSON.stringify(sortOptions)}`)
 
-    // Build query with pagination
-    let query = Product.find(filter).populate('categoryId', 'name slug')
+    // Build query with pagination and sorting
+    let query = Product.find(filter)
+      .populate('categoryId', 'name slug')
+      .sort(sortOptions)
+    
     if (limit > 0) {
       query = query.skip(skip).limit(limit)
     }

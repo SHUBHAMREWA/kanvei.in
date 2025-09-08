@@ -335,6 +335,7 @@ export default function ProductsPage() {
   const [error, setError] = useState(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [usingCache, setUsingCache] = useState(false)
+  const [isFiltering, setIsFiltering] = useState(false)
 
   // Handle URL search parameters
   useEffect(() => {
@@ -378,7 +379,7 @@ export default function ProductsPage() {
           setHasMore(cachedProducts.pagination?.hasMore || false)
           setCurrentPage(cachedProducts.pagination?.currentPage || 1)
           setCategories(cachedCategories || [])
-          setUsingCache(true)
+          setUsingCache(true) // Only show when loading from initial cache
           setError(null)
           setLoading(false)
           return // Exit early, no API calls needed!
@@ -499,6 +500,20 @@ export default function ProductsPage() {
     fetchInitialData()
   }, [])
   
+  // Watch for filter changes and trigger API calls
+  useEffect(() => {
+    // Skip initial render and only trigger when filters actually change
+    if (loading) return
+    
+    const isAnyFilterActive = hasActiveFilters()
+    
+    if (isAnyFilterActive) {
+      console.log('🔍 Filter changed, fetching filtered products...')
+      setCurrentPage(1) // Reset to first page
+      fetchProducts(true, 1, false)
+    }
+  }, [selectedCategory, searchTerm, priceRange, sortBy, inStock])
+  
   // Intersection Observer for footer detection
   useEffect(() => {
     const footer = document.querySelector('footer')
@@ -526,13 +541,138 @@ export default function ProductsPage() {
     }
   }, [])
 
-  // Function to reset all filters
-  const resetAllFilters = () => {
+  // Check if any filters are currently applied
+  const hasActiveFilters = () => {
+    return (
+      selectedCategory !== "" ||
+      searchTerm !== "" ||
+      priceRange.min !== 0 ||
+      priceRange.max !== 10000 ||
+      sortBy !== "name" ||
+      inStock === true
+    )
+  }
+  
+  // Function to reset all filters and restore cache
+  const resetAllFilters = async () => {
+    console.log('🔄 Clearing all filters...')
     setSelectedCategory("")
     setSearchTerm("")
     setPriceRange({ min: 0, max: 10000 })
     setSortBy("name")
     setInStock(false)
+    setCurrentPage(1)
+    setIsFiltering(false)
+    
+    // Try to restore from cache first
+    const cachedProducts = getCachedData(CACHE_KEY)
+    if (cachedProducts && cachedProducts.products) {
+      console.log('📦 Restoring products from cache after filter clear')
+      setProducts(cachedProducts.products)
+      setTotalProducts(cachedProducts.pagination?.totalCount || 0)
+      setHasMore(cachedProducts.pagination?.hasMore || false)
+      setCurrentPage(cachedProducts.pagination?.currentPage || 1)
+      // Don't show cached indicator when manually restoring from cache after filter clear
+      setUsingCache(false)
+    } else {
+      // If no cache, fetch fresh data
+      console.log('🆕 No cache available, fetching fresh data after filter clear')
+      await fetchProducts(false)
+    }
+    // Ensure cached indicator is hidden after filter clear
+    setUsingCache(false)
+  }
+  
+  // New function to fetch products with or without filters
+  const fetchProducts = async (withFilters = false, page = 1, loadMore = false) => {
+    try {
+      if (!loadMore) {
+        setLoading(true)
+      } else {
+        setLoadingMore(true)
+      }
+      
+      // Build API URL with filters
+      let apiUrl = `/api/products?page=${page}&limit=${itemsPerPage}`
+      
+      if (withFilters || hasActiveFilters()) {
+        console.log('🔍 Fetching products with filters...')
+        setIsFiltering(true)
+        setUsingCache(false)
+        
+        // Add filter parameters
+        if (selectedCategory) {
+          apiUrl += `&category=${encodeURIComponent(selectedCategory.toLowerCase())}`
+        }
+        if (searchTerm) {
+          apiUrl += `&search=${encodeURIComponent(searchTerm)}`
+        }
+        if (priceRange.min > 0) {
+          apiUrl += `&priceMin=${priceRange.min}`
+        }
+        if (priceRange.max < 10000) {
+          apiUrl += `&priceMax=${priceRange.max}`
+        }
+        if (inStock) {
+          apiUrl += `&inStock=true`
+        }
+        if (sortBy && sortBy !== 'name') {
+          apiUrl += `&sortBy=${sortBy}`
+        }
+        
+        console.log('📡 Filter API URL:', apiUrl)
+      } else {
+        console.log('📦 Fetching products without filters (can use cache)')
+        setIsFiltering(false)
+      }
+      
+      const response = await fetch(apiUrl, {
+        headers: {
+          'Cache-Control': withFilters || hasActiveFilters() ? 'no-cache' : 'default',
+        }
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        if (loadMore) {
+          // Append to existing products
+          const newProducts = [...products, ...data.products]
+          setProducts(newProducts)
+        } else {
+          // Replace products
+          setProducts(data.products)
+        }
+        
+        setTotalProducts(data.pagination?.totalCount || 0)
+        setHasMore(data.pagination?.hasMore || false)
+        setCurrentPage(page)
+        setError(null)
+        
+        // Only cache if no filters applied
+        if (!withFilters && !hasActiveFilters() && !loadMore) {
+          console.log('💾 Caching unfiltered products')
+          setCachedData(CACHE_KEY, {
+            products: data.products,
+            pagination: data.pagination
+          })
+        }
+        // Never show cached indicator when making fresh API calls
+        setUsingCache(false)
+        
+        console.log(`✅ Products loaded: ${data.products.length} (page ${page})`)
+        console.log('📊 Pagination:', data.pagination)
+      } else {
+        console.error('❌ Failed to fetch products:', data.error)
+        setError(data.error || 'Failed to fetch products')
+      }
+    } catch (error) {
+      console.error('❌ Error fetching products:', error)
+      setError('Failed to fetch products. Please try again.')
+    } finally {
+      setLoading(false)
+      setLoadingMore(false)
+    }
   }
   
   // Function to force refresh cache
@@ -552,87 +692,18 @@ export default function ProductsPage() {
     fetchData()
   }
 
-  // Function to load more products (updates cache too)
+  // Function to load more products with filtering support
   const loadMoreProducts = async () => {
     if (!hasMore || loadingMore) return
     
-    try {
-      setLoadingMore(true)
-      const nextPage = currentPage + 1
-      
-      console.log(`📦 Loading more products - page ${nextPage}`)
-      
-      const productsRes = await fetch(`/api/products?page=${nextPage}&limit=${itemsPerPage}`, {
-        headers: {
-          'Cache-Control': 'no-cache',
-        }
-      })
-      const productsData = await productsRes.json()
-      
-      if (productsData.success) {
-        const newProducts = [...products, ...productsData.products]
-        setProducts(newProducts)
-        setCurrentPage(nextPage)
-        setHasMore(productsData.pagination?.hasMore || false)
-        
-        // Update cache with new combined data
-        const cacheData = {
-          products: newProducts,
-          pagination: {
-            ...productsData.pagination,
-            currentPage: nextPage,
-            totalCount: productsData.pagination?.totalCount || totalProducts
-          }
-        }
-        
-        setCachedData(CACHE_KEY, cacheData)
-        
-        console.log(`💾 Updated cache with ${newProducts.length} total products (page ${nextPage})`)
-        console.log(`📊 Pagination:`, {
-          currentPage: nextPage,
-          totalProducts: cacheData.pagination.totalCount,
-          hasMore: cacheData.pagination.hasMore
-        })
-      } else {
-        console.error('⚠️ Failed to load more products:', productsData.error)
-      }
-    } catch (error) {
-      console.error("Error loading more products:", error)
-    } finally {
-      setLoadingMore(false)
-    }
+    const nextPage = currentPage + 1
+    console.log(`📦 Loading more products - page ${nextPage} (filtering: ${isFiltering})`)
+    
+    await fetchProducts(isFiltering, nextPage, true)
   }
 
-  const filteredProducts = products.filter((product) => {
-    const matchesCategory = !selectedCategory || product.category === selectedCategory
-    const matchesSearch =
-      !searchTerm ||
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.description.toLowerCase().includes(searchTerm.toLowerCase())
-
-    const matchesPrice =
-      (priceRange.min === 0 || product.price >= priceRange.min) &&
-      (priceRange.max === 10000 || product.price <= priceRange.max)
-
-    const matchesStock = !inStock || product.stock > 0
-
-    return matchesCategory && matchesSearch && matchesPrice && matchesStock
-  })
-
-  const sortedProducts = [...filteredProducts].sort((a, b) => {
-    switch (sortBy) {
-      case "price-low":
-        return a.price - b.price
-      case "price-high":
-        return b.price - a.price
-      case "name":
-        return a.name.localeCompare(b.name)
-      case "newest":
-        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
-      default:
-        return 0
-    }
-  })
+  // Products are now pre-filtered and sorted by the API
+  const displayProducts = products
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -1115,7 +1186,7 @@ export default function ProductsPage() {
                     {/* Products Grid Skeleton */}
                     <ProductGridSkeleton itemsPerRow={5} rows={2} />
                   </>
-                ) : sortedProducts.length > 0 ? (
+                ) : displayProducts.length > 0 ? (
                   <>
                     {/* Results Header */}
                     <div className="mb-8 flex justify-between items-start gap-4">
@@ -1124,19 +1195,25 @@ export default function ProductsPage() {
                           🛍️ Products Collection
                         </h2>
                         
-                        {/* Show total products count with cache indicator */}
+                        {/* Show total products count with filtering status */}
                         <div className="flex items-center gap-3 mb-2">
                           <p className="text-sm lg:text-lg" style={{ fontFamily: "Montserrat, sans-serif", color: "#8C6141" }}>
-                            {(selectedCategory || searchTerm || priceRange.min !== 0 || priceRange.max !== 10000 || inStock) ? (
-                              `Showing ${sortedProducts.length} of ${products.length} products (${totalProducts} total available)`
+                            {isFiltering ? (
+                              `Showing ${displayProducts.length} filtered results of ${totalProducts} total products`
                             ) : (
-                              `Showing ${products.length} of ${totalProducts} products`
+                              `Showing ${displayProducts.length} of ${totalProducts} products`
                             )}
                           </p>
                           
+                          
+                          {isFiltering && (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                              🔍 Filtered
+                            </span>
+                          )}
                         </div>
                         
-                        {(selectedCategory || searchTerm || priceRange.min !== 0 || priceRange.max !== 10000 || inStock) && (
+                        {hasActiveFilters() && (
                           <div className="flex flex-wrap gap-2">
                             <span className="text-xs bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800 px-3 py-1.5 rounded-full font-medium shadow-sm" style={{ fontFamily: "Montserrat, sans-serif" }}>
                               ✨ Filters applied
@@ -1148,13 +1225,13 @@ export default function ProductsPage() {
 
                     {/* Products Grid */}
                     <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5 gap-4 sm:gap-6">
-                      {sortedProducts.map((product) => (
+                      {displayProducts.map((product) => (
                         <ProductCard key={product._id} product={product} />
                       ))}
                     </div>
                     
-                    {/* Load More Button - Only show when no filters applied and there are more products to load */}
-                    {!selectedCategory && !searchTerm && priceRange.min === 0 && priceRange.max === 10000 && !inStock && (
+                    {/* Load More Button - Show when there are more products to load */}
+                    {(
                       <div className="mt-12 text-center">
                         {loadingMore ? (
                           <>
